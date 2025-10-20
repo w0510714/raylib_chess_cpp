@@ -1,0 +1,32 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build all C++ files with Raylib",
+        "type": "shell",
+        "command": "g++",
+        "args": [
+          "-g",
+          "*.cpp",
+          "-o",
+          "main.exe",
+          "-I", "C:/raylib/include",
+          "-L", "C:/raylib/lib",
+          "-lraylib",
+          "-lopengl32",
+          "-lgdi32",
+          "-lwinmm"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": "$gcc",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "detail": "Build all .cpp files with Raylib"
+      }
+    ]
+  }
+  
