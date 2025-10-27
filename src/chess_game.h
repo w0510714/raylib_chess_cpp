@@ -26,28 +26,19 @@ enum GameStatus {
 };
 
 class ChessGame {
-    public:
-        ChessGame(); // starts a new game
-        ~ChessGame();
+public:
+    ChessGame();
+    ~ChessGame() = default;
 
-        // Returns the piece at the given position
-        char getPieceAt(int row, int col) const;
+    PieceType getPieceAt(int row, int col) const;
+    bool makeMove(int startRow, int startCol, int endRow, int endCol);
+    GameStatus getGameStatus() const { return status; }
+    bool isWhiteTurn() const { return whiteTurn; }
 
-        // Attempts to make a move; returns true if successful
-        bool makeMove(int startRow, int startCol, int endRow, int endCol);
+private:
+    PieceType board[8][8];
+    bool whiteTurn;
+    GameStatus status;
 
-        // Returns the current status of the game
-        GameStatus getGameStatus() const;
-
-        // Returns true if it's white's turn, false otherwise
-        bool isWhiteTurn() const;
-
-    private:
-        // 8x8 board representation
-        PieceType board[8][8];
-        bool whiteTurn;
-        GameStatus status;
-
-
-        void initializeBoard();
+    void initializeBoard();
 };

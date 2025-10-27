@@ -4,4 +4,5 @@
 int main() {
     ChessAnalysisProgram app;
     app.run();    
+    return 0;
 }

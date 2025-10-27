@@ -25,9 +25,16 @@ private:
     Texture2D blackPawnTexture;
 
     ChessGame currentPosition;
+
+    // Drag and drop state
+    bool dragging = false;
+    int dragRow = -1, dragCol = -1;
+    Vector2 dragOffset = {0, 0};
+    PieceType draggedPiece = PieceType::EMPTY;
+
     // Loads textures for board and pieces
-    void RenderGame();
-    void UpdateGame();
+    void renderGame();
+    void updateGame();
     void renderUI();
     void renderBoard();
     void renderPieces();
@@ -35,7 +42,4 @@ private:
     void loadAllTextures();
     void unloadAllTextures();
     Texture2D getTextureForPiece(PieceType Place);
-    
-    
-    
 };
