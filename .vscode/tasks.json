@@ -1,32 +1,45 @@
 {
     "version": "2.0.0",
     "tasks": [
-      {
-        "label": "Build all C++ files with Raylib",
-        "type": "shell",
-        "command": "g++",
-        "args": [
-          "-g",
-          "*.cpp",
-          "-o",
-          "main.exe",
-          "-I", "C:/raylib/include",
-          "-L", "C:/raylib/lib",
-          "-lraylib",
-          "-lopengl32",
-          "-lgdi32",
-          "-lwinmm"
-        ],
-        "options": {
-          "cwd": "${workspaceFolder}"
+        {
+            "label": "build",
+            "type": "cppbuild",
+            "command": "C:/mingw-w64/bin/g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "src/*.cpp",
+                "-o",
+                "main.exe",
+                "-I",
+                "C:/raylib/include",
+                "-L",
+                "C:/raylib/lib",
+                "-lraylib",
+                "-lopengl32",
+                "-lgdi32",
+                "-lwinmm"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build C++ project with Raylib"
         },
-        "problemMatcher": "$gcc",
-        "group": {
-          "kind": "build",
-          "isDefault": true
-        },
-        "detail": "Build all .cpp files with Raylib"
-      }
+        {
+            "label": "run",
+            "type": "shell",
+            "command": "./main.exe",
+            "group": "test",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "build",
+            "problemMatcher": []
+        }
     ]
-  }
-  
+}

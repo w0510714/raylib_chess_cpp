@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Raylib App",
+      "name": "Debug C++",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/main.exe",
@@ -10,9 +10,18 @@
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
-      "externalConsole": true,
+      "externalConsole": false,
       "MIMode": "gdb",
-      "miDebuggerPath": "C:/mingw-w64/bin/gdb.exe"
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "build",
+      "miDebuggerPath": "C:/mingw-w64/bin/gdb.exe",
+      "miDebuggerArgs": ""
     },
     {
       "name": "C/C++ Runner: Debug Session",
@@ -21,10 +30,10 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/seanj/OneDrive/Desktop/PROG2100 C++/raylib_chess",
-      "program": "c:/Users/seanj/OneDrive/Desktop/PROG2100 C++/raylib_chess/build/Debug/outDebug",
+      "cwd": ".",
+      "program": "build/Debug/outDebug",
       "MIMode": "gdb",
-      "miDebuggerPath": "gdb",
+      "miDebuggerPath": "C:/mingw-w64/bin/gdb.exe",
       "setupCommands": [
         {
           "description": "Enable pretty-printing for gdb",
