@@ -1,5 +1,6 @@
-#pragma
+#pragma once
 #include "pawn_movement.h"
+#include "king_movement.h"
 #include "piece.h"
 
 class ChessGame {
@@ -16,7 +17,8 @@ private:
     PieceType board[8][8];
     bool whiteTurn;
     GameStatus status;
-    PawnMovement* pawnValidatorPtr;
+    PawnMovement pawnValidator;
+    KingMovement kingValidator;
 
     void initializeBoard();
 };
