@@ -1,6 +1,6 @@
 # A Simple Chess Game
 #
-# The start of a 5 part assignment
+# The part 2 of a 5 part assignment
 #
 # Run w/ Raylib (I use F5)
 #

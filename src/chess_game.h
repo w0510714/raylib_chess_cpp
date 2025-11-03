@@ -1,29 +1,6 @@
 #pragma
-
-// enum for different chess pieces
-enum class PieceType {
-    EMPTY,
-    WHITE_PAWN,
-    WHITE_KNIGHT,
-    WHITE_BISHOP,
-    WHITE_ROOK,
-    WHITE_QUEEN,
-    WHITE_KING,
-    BLACK_PAWN,
-    BLACK_KNIGHT,
-    BLACK_BISHOP,
-    BLACK_ROOK,
-    BLACK_QUEEN,
-    BLACK_KING
-};
-
-enum GameStatus {
-    ONGOING,
-    CHECK,
-    CHECKMATE,
-    STALEMATE,
-    DRAW
-};
+#include "pawn_movement.h"
+#include "piece.h"
 
 class ChessGame {
 public:
@@ -39,6 +16,7 @@ private:
     PieceType board[8][8];
     bool whiteTurn;
     GameStatus status;
+    PawnMovement* pawnValidatorPtr;
 
     void initializeBoard();
 };

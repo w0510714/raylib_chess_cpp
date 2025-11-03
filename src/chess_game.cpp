@@ -1,7 +1,10 @@
 #include "chess_game.h"
+#include "pawn_movement.h"
+#include <cstring>
 
 ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING) {
     initializeBoard();
+    pawnValidatorPtr = new PawnMovement();
 }
 
 void ChessGame::initializeBoard() {
@@ -47,12 +50,41 @@ PieceType ChessGame::getPieceAt(int row, int col) const {
 }
 
 bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
+    // Validate bounds
     if (startRow < 0 || startRow >= 8 || startCol < 0 || startCol >= 8 ||
-        endRow < 0 || endRow >= 8 || endCol < 0 || endCol >= 8)
+        endRow < 0 || endRow >= 8 || endCol < 0 || endCol >= 8) {
         return false;
+    }
 
-    // Just move visually, no rules yet
-    board[endRow][endCol] = board[startRow][startCol];
+    // Check there is a piece
+    PieceType movingPiece = board[startRow][startCol];
+    if (movingPiece == PieceType::EMPTY) return false;
+
+    // Check piece color matches turn
+    bool isWhitePiece = (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::WHITE_KNIGHT ||
+                         movingPiece == PieceType::WHITE_BISHOP || movingPiece == PieceType::WHITE_ROOK ||
+                         movingPiece == PieceType::WHITE_QUEEN || movingPiece == PieceType::WHITE_KING);
+
+    if (whiteTurn && !isWhitePiece) return false;
+    if (!whiteTurn && isWhitePiece) return false;
+
+    // Validate the move depending on piece
+    bool valid = false;
+    if (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) {
+        valid = pawnValidatorPtr->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+    } else {
+        // For non-pawn pieces: allow for now (you can add validators later)
+        valid = true;
+    }
+
+    if (!valid) return false;
+
+    // Make the move
+    board[endRow][endCol] = movingPiece;
     board[startRow][startCol] = PieceType::EMPTY;
+
+    // Switch turn
+    whiteTurn = !whiteTurn;
+
     return true;
 }

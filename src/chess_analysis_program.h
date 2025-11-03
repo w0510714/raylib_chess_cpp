@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 #include "chess_game.h"
+#include "piece.h"
 
 class ChessAnalysisProgram {
 public:

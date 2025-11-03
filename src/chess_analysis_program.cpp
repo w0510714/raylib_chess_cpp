@@ -110,11 +110,16 @@ void ChessAnalysisProgram::renderUI(){
 }
 
 void ChessAnalysisProgram::renderBoard(){
-    DrawTextureEx(this->boardTexture, {0, 0}, 0.0f, 0.65f, WHITE);
+    // Calculate scale to fit board perfectly in window
+    float scale = GetScreenHeight() / (float)boardTexture.height;
+    DrawTextureEx(this->boardTexture, {0, 0}, 0.0f, scale, WHITE);
 }
 
 void ChessAnalysisProgram::renderPieces() {
-    float squareSize = boardTexture.width * 0.676f / 8.0f;
+    float boardScale = GetScreenHeight() / (float)boardTexture.height;
+    float squareSize = (boardTexture.width * boardScale) / 8.0f;
+    float pieceScale = boardScale * 1.0f;  // Slightly smaller than the square for better fit
+    float pieceOffset = (squareSize - (pieceScale * boardTexture.width / 10.5f)) / 2.0f;
 
     for (int row = 0; row < 8; ++row) {
         for (int col = 0; col < 8; ++col) {
@@ -126,8 +131,11 @@ void ChessAnalysisProgram::renderPieces() {
                 continue;
 
             Texture2D tex = getTextureForPiece(piece);
-            Vector2 pos = { col * squareSize, row * squareSize };
-            DrawTextureEx(tex, pos, 0.0f, 0.65f, WHITE);
+            Vector2 pos = { 
+                col * squareSize + pieceOffset,
+                row * squareSize + pieceOffset 
+            };
+            DrawTextureEx(tex, pos, 0.0f, pieceScale, WHITE);
         }
     }
 
@@ -135,9 +143,9 @@ void ChessAnalysisProgram::renderPieces() {
     if (dragging && draggedPiece != PieceType::EMPTY) {
         Texture2D tex = getTextureForPiece(draggedPiece);
         Vector2 pos = GetMousePosition();
-        pos.x += dragOffset.x;
-        pos.y += dragOffset.y;
-        DrawTextureEx(tex, pos, 0.0f, 0.65f, WHITE);
+        pos.x += dragOffset.x + pieceOffset;
+        pos.y += dragOffset.y + pieceOffset;
+        DrawTextureEx(tex, pos, 0.0f, pieceScale, WHITE);
     }
 }
 
@@ -160,26 +168,48 @@ Texture2D ChessAnalysisProgram::getTextureForPiece(PieceType piece) {
 }
 
 void ChessAnalysisProgram::updateGame() {
-    float squareSize = boardTexture.width * 0.65f / 8.0f;
+    float boardScale = GetScreenHeight() / (float)boardTexture.height;
+    float squareSize = (boardTexture.width * boardScale) / 8.0f;
+    float pieceScale = boardScale * 1.0f;
     Vector2 mousePos = GetMousePosition();
+    
+    // Calculate board-relative position
     int col = static_cast<int>(mousePos.x / squareSize);
     int row = static_cast<int>(mousePos.y / squareSize);
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        PieceType piece = currentPosition.getPieceAt(row, col);
-        if (piece != PieceType::EMPTY) {
-            dragging = true;
-            dragRow = row;
-            dragCol = col;
-            draggedPiece = piece;
-            dragOffset = { -squareSize / 2, -squareSize / 2 };
+        if (row >= 0 && row < 8 && col >= 0 && col < 8) {  // Make sure we're clicking within the board
+            PieceType piece = currentPosition.getPieceAt(row, col);
+            if (piece != PieceType::EMPTY) {
+            bool isWhitePiece = (piece == PieceType::WHITE_PAWN || piece == PieceType::WHITE_KNIGHT ||
+                                piece == PieceType::WHITE_BISHOP || piece == PieceType::WHITE_ROOK ||
+                                piece == PieceType::WHITE_QUEEN || piece == PieceType::WHITE_KING);
+            // Only allow dragging pieces that belong to the current player
+            if ((currentPosition.isWhiteTurn() && isWhitePiece) ||
+                (!currentPosition.isWhiteTurn() && !isWhitePiece)) {
+                dragging = true;
+                dragRow = row;
+                dragCol = col;
+                draggedPiece = piece;
+                dragOffset = { -squareSize / 2, -squareSize / 2 };
+                }
+            }
         }
     }
 
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && dragging) {
         int newCol = static_cast<int>(mousePos.x / squareSize);
         int newRow = static_cast<int>(mousePos.y / squareSize);
-        currentPosition.makeMove(dragRow, dragCol, newRow, newCol);
+        
+        // Only make the move if both the start and end positions are within the board
+        if (dragRow >= 0 && dragRow < 8 && dragCol >= 0 && dragCol < 8 &&
+            newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+            if (!currentPosition.makeMove(dragRow, dragCol, newRow, newCol)) {
+                // If move fails, the piece should already be in its original position
+                // because makeMove() didn't modify the board
+            }
+        }
+        
         dragging = false;
         draggedPiece = PieceType::EMPTY;
     }
