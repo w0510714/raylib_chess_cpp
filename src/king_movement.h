@@ -1,5 +1,6 @@
 #pragma once
-#include "piece.h"
+#include "chess_game_enums.h"
+#include "move_validator.h"
 
 class KingMovement {
 public:

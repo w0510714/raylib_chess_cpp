@@ -1,12 +1,13 @@
 #include "chess_game.h"
+#include "move_validator.h"
 #include "pawn_movement.h"
 #include "king_movement.h"
 #include <cstring>
 
 ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING) {
     initializeBoard();
-    pawnValidator = PawnMovement();
-    kingValidator = KingMovement();
+    std::unique_ptr<MoveValidator> pawnValidator;
+    std::unique_ptr<MoveValidator> kingValidator;
 }
 
 void ChessGame::initializeBoard() {
@@ -73,9 +74,9 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     // Validate the move depending on piece
     bool valid = false;
     if (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) {
-        valid = pawnValidator.isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+        valid = pawnValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
     } else if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
-        valid = kingValidator.isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+        valid = kingValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
     } else {
         // Later we’ll add validators for other pieces
         valid = true; // allow for now

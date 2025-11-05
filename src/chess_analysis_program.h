@@ -2,7 +2,7 @@
 
 #include <raylib.h>
 #include "chess_game.h"
-#include "piece.h"
+#include "chess_game_enums.h"
 
 class ChessAnalysisProgram {
 public:

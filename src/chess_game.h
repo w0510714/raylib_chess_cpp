@@ -1,7 +1,8 @@
 #pragma once
 #include "pawn_movement.h"
 #include "king_movement.h"
-#include "piece.h"
+#include "chess_game_enums.h"
+#include <memory>
 
 class ChessGame {
 public:
@@ -17,8 +18,8 @@ private:
     PieceType board[8][8];
     bool whiteTurn;
     GameStatus status;
-    PawnMovement pawnValidator;
-    KingMovement kingValidator;
+    std::unique_ptr<PawnMovement> pawnValidator;
+    std::unique_ptr<KingMovement> kingValidator;
 
     void initializeBoard();
 };
