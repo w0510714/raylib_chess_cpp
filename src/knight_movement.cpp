@@ -1,22 +1,23 @@
-#include "king_movement.h"
+#include "knight_movement.h"
 #include <cmath>
 
-bool KingMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, PieceType board[8][8]) {
+bool KnightMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, PieceType board[8][8]) {
     int rowDiff = std::abs(endRow - startRow);
     int colDiff = std::abs(endCol - startCol);
 
-    // Cannot stay in place
-    if (rowDiff == 0 && colDiff == 0) return false;
-
-    // King moves only one square in any direction
-    if (rowDiff > 1 || colDiff > 1) return false;
+    // Knight moves in L-shape: 2 by 1 or 1 by 2
+    if (!((rowDiff == 2 && colDiff == 1) || (rowDiff == 1 && colDiff == 2))) {
+        return false;
+    }
 
     // Determine piece colors
-    bool isWhite = (piece == PieceType::WHITE_KING);
+    bool isWhite = (piece == PieceType::WHITE_KNIGHT);
     PieceType target = board[endRow][endCol];
 
     // If target square is empty, move is fine
-    if (target == PieceType::EMPTY) return true;
+    if (target == PieceType::EMPTY) {
+        return true;
+    }
 
     // Otherwise, can only capture opposing color
     bool targetIsWhite = (

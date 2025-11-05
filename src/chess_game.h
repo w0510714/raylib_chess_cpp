@@ -1,6 +1,11 @@
 #pragma once
+#include "move_validator.h"
 #include "pawn_movement.h"
 #include "king_movement.h"
+#include "queen_movement.h"
+#include "rook_movement.h"
+#include "bishop_movement.h"
+#include "knight_movement.h"
 #include "chess_game_enums.h"
 #include <memory>
 
@@ -20,6 +25,10 @@ private:
     GameStatus status;
     std::unique_ptr<PawnMovement> pawnValidator;
     std::unique_ptr<KingMovement> kingValidator;
+    std::unique_ptr<QueenMovement> queenValidator;
+    std::unique_ptr<RookMovement> rookValidator;
+    std::unique_ptr<BishopMovement> bishopValidator;
+    std::unique_ptr<KnightMovement> knightValidator;
 
     void initializeBoard();
 };

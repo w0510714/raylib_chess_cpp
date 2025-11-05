@@ -187,11 +187,11 @@ void ChessAnalysisProgram::updateGame() {
             // Only allow dragging pieces that belong to the current player
             if ((currentPosition.isWhiteTurn() && isWhitePiece) ||
                 (!currentPosition.isWhiteTurn() && !isWhitePiece)) {
-                dragging = true;
-                dragRow = row;
-                dragCol = col;
-                draggedPiece = piece;
-                dragOffset = { -squareSize / 2, -squareSize / 2 };
+                    dragging = true;
+                    dragRow = row;
+                    dragCol = col;
+                    draggedPiece = piece;
+                    dragOffset = { -squareSize / 2, -squareSize / 2 };
                 }
             }
         }

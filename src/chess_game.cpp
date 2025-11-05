@@ -1,13 +1,14 @@
 #include "chess_game.h"
-#include "move_validator.h"
-#include "pawn_movement.h"
-#include "king_movement.h"
 #include <cstring>
 
 ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING) {
     initializeBoard();
     std::unique_ptr<MoveValidator> pawnValidator;
     std::unique_ptr<MoveValidator> kingValidator;
+    std::unique_ptr<MoveValidator> queenValidator;
+    std::unique_ptr<MoveValidator> rookValidator;
+    std::unique_ptr<MoveValidator> bishopValidator;
+    std::unique_ptr<MoveValidator> knightValidator;
 }
 
 void ChessGame::initializeBoard() {
@@ -77,10 +78,15 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
         valid = pawnValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
     } else if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
         valid = kingValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
-    } else {
-        // Later we’ll add validators for other pieces
-        valid = true; // allow for now
-}
+    } else if (movingPiece == PieceType::WHITE_QUEEN || movingPiece == PieceType::BLACK_QUEEN) {
+        valid = queenValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+    } else if (movingPiece == PieceType::WHITE_ROOK || movingPiece == PieceType::BLACK_ROOK) {
+        valid = rookValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+    } else if (movingPiece == PieceType::WHITE_BISHOP || movingPiece == PieceType::BLACK_BISHOP) {
+        valid = bishopValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+    } else if (movingPiece == PieceType::WHITE_KNIGHT || movingPiece == PieceType::BLACK_KNIGHT) {
+        valid = knightValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+    }
 
     if (!valid) return false;
 
