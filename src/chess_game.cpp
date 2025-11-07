@@ -1,6 +1,7 @@
 #include "chess_game.h"
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 
 ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING) {
     initializeBoard();
@@ -61,6 +62,11 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
         return false;
     }
 
+    if (gameOver) {
+        std::cout << "Game over! No more moves allowed.\n";
+        return false;
+    }
+
     if (startRow == endRow && startCol == endCol) {
         return false;
     }
@@ -95,6 +101,17 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     }
 
     if (!valid) return false;
+
+    // Prevent capturing own piece
+    PieceType target = board[endRow][endCol];
+    bool targetIsWhite =
+        (target == PieceType::WHITE_PAWN || target == PieceType::WHITE_KNIGHT ||
+        target == PieceType::WHITE_BISHOP || target == PieceType::WHITE_ROOK ||
+        target == PieceType::WHITE_QUEEN || target == PieceType::WHITE_KING);
+
+    if (target != PieceType::EMPTY && targetIsWhite == isWhitePiece) {
+        return false; // can't capture your own team
+    }
 
     PieceType origStart = board[startRow][startCol];
     PieceType origEnd   = board[endRow][endCol];
@@ -198,7 +215,16 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     if (movingPiece == PieceType::WHITE_KING && !willBeCastling) whiteKingMoved = true;
     if (movingPiece == PieceType::BLACK_KING && !willBeCastling) blackKingMoved = true;
 
+    // Switch turn
     whiteTurn = !whiteTurn;
+
+    // After move, check if opponent is checkmated
+    bool opponentIsWhite = whiteTurn; // we just flipped turns
+    if (isCheckmate(opponentIsWhite)) {
+        std::cout << (opponentIsWhite ? "White" : "Black") << " is checkmated!\n";
+        gameOver = true;
+    }
+
     return true;
 }
 
@@ -259,3 +285,69 @@ bool ChessGame::isKingInCheck(bool whiteKing) const {
     return false;
 }
 
+bool ChessGame::isCheckmate(bool whiteKing) {
+    // 1. If the king is NOT in check, it’s not checkmate
+    if (!isKingInCheck(whiteKing))
+        return false;
+
+    // 2. Try every possible move for every piece of this color
+    for (int startRow = 0; startRow < 8; ++startRow) {
+        for (int startCol = 0; startCol < 8; ++startCol) {
+            PieceType piece = board[startRow][startCol];
+            if (piece == PieceType::EMPTY) continue;
+
+            bool isWhitePiece = (
+                piece == PieceType::WHITE_PAWN || piece == PieceType::WHITE_KNIGHT ||
+                piece == PieceType::WHITE_BISHOP || piece == PieceType::WHITE_ROOK ||
+                piece == PieceType::WHITE_QUEEN || piece == PieceType::WHITE_KING
+            );
+
+            // Skip opponent pieces
+            if (isWhitePiece != whiteKing) continue;
+
+            for (int endRow = 0; endRow < 8; ++endRow) {
+                for (int endCol = 0; endCol < 8; ++endCol) {
+                    if (startRow == endRow && startCol == endCol) continue;
+
+                    bool valid = false;
+
+                    // Use the same logic you use in makeMove
+                    if (piece == PieceType::WHITE_PAWN || piece == PieceType::BLACK_PAWN)
+                        valid = pawnValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board, -1, -1);
+                    else if (piece == PieceType::WHITE_KING || piece == PieceType::BLACK_KING)
+                        valid = kingValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board,
+                                                           whiteKing ? whiteKingMoved : blackKingMoved,
+                                                           whiteKing ? whiteRookKingsideMoved : blackRookKingsideMoved,
+                                                           whiteKing ? whiteRookQueensideMoved : blackRookQueensideMoved);
+                    else if (piece == PieceType::WHITE_QUEEN || piece == PieceType::BLACK_QUEEN)
+                        valid = queenValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board);
+                    else if (piece == PieceType::WHITE_ROOK || piece == PieceType::BLACK_ROOK)
+                        valid = rookValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board);
+                    else if (piece == PieceType::WHITE_BISHOP || piece == PieceType::BLACK_BISHOP)
+                        valid = bishopValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board);
+                    else if (piece == PieceType::WHITE_KNIGHT || piece == PieceType::BLACK_KNIGHT)
+                        valid = knightValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board);
+
+                    if (!valid) continue;
+
+                    // Simulate move
+                    PieceType captured = board[endRow][endCol];
+                    board[endRow][endCol] = piece;
+                    board[startRow][startCol] = PieceType::EMPTY;
+
+                    bool stillInCheck = isKingInCheck(whiteKing);
+
+                    // Undo move
+                    board[startRow][startCol] = piece;
+                    board[endRow][endCol] = captured;
+
+                    if (!stillInCheck)
+                        return false; // Found at least one escape move
+                }
+            }
+        }
+    }
+
+    // No move could escape check → checkmate
+    return true;
+}

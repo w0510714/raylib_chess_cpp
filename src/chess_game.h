@@ -18,12 +18,15 @@ public:
     bool makeMove(int startRow, int startCol, int endRow, int endCol);
     GameStatus getGameStatus() const { return status; }
     bool isWhiteTurn() const { return whiteTurn; }
+    bool isGameOver() const { return gameOver; }
 
 private:
     PieceType board[8][8];
     bool whiteTurn;
     GameStatus status;
     bool isKingInCheck(bool whiteKing) const;
+    bool isCheckmate(bool whiteKing);
+    bool gameOver = false;
     std::unique_ptr<PawnMovement> pawnValidator;
     std::unique_ptr<KingMovement> kingValidator;
     std::unique_ptr<QueenMovement> queenValidator;
