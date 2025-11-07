@@ -1,28 +1,34 @@
 #include "king_movement.h"
-#include <cmath>
+#include <cstdlib>
 
-bool KingMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, PieceType board[8][8]) {
+bool KingMovement::isValidMove(
+    PieceType piece,
+    int startRow, int startCol,
+    int endRow, int endCol,
+    const PieceType board[8][8],
+    bool kingMoved, bool rookKingsideMoved, bool rookQueensideMoved
+) const {
     int rowDiff = std::abs(endRow - startRow);
     int colDiff = std::abs(endCol - startCol);
 
-    // Cannot stay in place
-    if (rowDiff == 0 && colDiff == 0) return false;
+    // Normal king move: 1 square any direction
+    if (rowDiff <= 1 && colDiff <= 1)
+        return true;
 
-    // King moves only one square in any direction
-    if (rowDiff > 1 || colDiff > 1) return false;
-
-    // Determine piece colors
+    // ==== CASTLING ====
     bool isWhite = (piece == PieceType::WHITE_KING);
-    PieceType target = board[endRow][endCol];
+    if (rowDiff == 0 && colDiff == 2 && !kingMoved) {
+        // Kingside castling
+        if (endCol > startCol && !rookKingsideMoved) {
+            if (board[startRow][5] == PieceType::EMPTY && board[startRow][6] == PieceType::EMPTY)
+                return true;
+        }
+        // Queenside castling
+        if (endCol < startCol && !rookQueensideMoved) {
+            if (board[startRow][1] == PieceType::EMPTY && board[startRow][2] == PieceType::EMPTY && board[startRow][3] == PieceType::EMPTY)
+                return true;
+        }
+    }
 
-    // If target square is empty, move is fine
-    if (target == PieceType::EMPTY) return true;
-
-    // Otherwise, can only capture opposing color
-    bool targetIsWhite = (
-        target == PieceType::WHITE_PAWN || target == PieceType::WHITE_KNIGHT || target == PieceType::WHITE_BISHOP ||
-        target == PieceType::WHITE_ROOK || target == PieceType::WHITE_QUEEN || target == PieceType::WHITE_KING
-    );
-
-    return (isWhite != targetIsWhite);
+    return false;
 }

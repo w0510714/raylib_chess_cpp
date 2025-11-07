@@ -30,5 +30,16 @@ private:
     std::unique_ptr<BishopMovement> bishopValidator;
     std::unique_ptr<KnightMovement> knightValidator;
 
+    int enPassantTargetRow = -1;
+    int enPassantTargetCol = -1;
+
+    bool whiteKingMoved = false;
+    bool blackKingMoved = false;
+    bool whiteRookKingsideMoved = false;
+    bool whiteRookQueensideMoved = false;
+    bool blackRookKingsideMoved = false;
+    bool blackRookQueensideMoved = false;
+
+
     void initializeBoard();
 };

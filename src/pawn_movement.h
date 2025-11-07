@@ -7,5 +7,6 @@ public:
     PawnMovement() = default;
 
     // board passed as const reference to array
-    bool isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, const PieceType board[8][8]) const;
+    bool isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol,
+                 const PieceType board[8][8], int enPassantTargetRow, int enPassantTargetCol) const;
 };

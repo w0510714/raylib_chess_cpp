@@ -1,4 +1,5 @@
 #include "chess_game.h"
+#include <cstdlib>
 #include <cstring>
 
 ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING) {
@@ -60,11 +61,9 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
         return false;
     }
 
-    // Check there is a piece
     PieceType movingPiece = board[startRow][startCol];
     if (movingPiece == PieceType::EMPTY) return false;
 
-    // Check piece color matches turn
     bool isWhitePiece = (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::WHITE_KNIGHT ||
                          movingPiece == PieceType::WHITE_BISHOP || movingPiece == PieceType::WHITE_ROOK ||
                          movingPiece == PieceType::WHITE_QUEEN || movingPiece == PieceType::WHITE_KING);
@@ -72,12 +71,16 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     if (whiteTurn && !isWhitePiece) return false;
     if (!whiteTurn && isWhitePiece) return false;
 
-    // Validate the move depending on piece
     bool valid = false;
+
     if (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) {
-        valid = pawnValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+        valid = pawnValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol,
+                                           board, enPassantTargetRow, enPassantTargetCol);
     } else if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
-        valid = kingValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
+        valid = kingValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board, 
+                                           isWhitePiece ? whiteKingMoved : blackKingMoved,
+                                           isWhitePiece ? whiteRookKingsideMoved : blackRookKingsideMoved,
+                                           isWhitePiece ? whiteRookQueensideMoved : blackRookQueensideMoved);
     } else if (movingPiece == PieceType::WHITE_QUEEN || movingPiece == PieceType::BLACK_QUEEN) {
         valid = queenValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board);
     } else if (movingPiece == PieceType::WHITE_ROOK || movingPiece == PieceType::BLACK_ROOK) {
@@ -90,12 +93,64 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
 
     if (!valid) return false;
 
-    // Make the move
+    // ====== PART 1: Handle En Passant Capture ======
+    if ((movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) &&
+        endCol != startCol && board[endRow][endCol] == PieceType::EMPTY) {
+        int capturedPawnRow = isWhitePiece ? endRow + 1 : endRow - 1;
+        board[capturedPawnRow][endCol] = PieceType::EMPTY;
+    }
+
+    // ====== PART 2: Move Piece ======
     board[endRow][endCol] = movingPiece;
     board[startRow][startCol] = PieceType::EMPTY;
 
-    // Switch turn
-    whiteTurn = !whiteTurn;
+    // ====== PART 3: Update En Passant Target ======
+    enPassantTargetRow = -1;
+    enPassantTargetCol = -1;
 
+    if ((movingPiece == PieceType::WHITE_PAWN && startRow - endRow == 2) ||
+        (movingPiece == PieceType::BLACK_PAWN && endRow - startRow == 2)) {
+        enPassantTargetRow = (startRow + endRow) / 2;
+        enPassantTargetCol = startCol;
+    }
+
+    // ===== CASTLING LOGIC =====
+    if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
+        bool isWhiteKing = (movingPiece == PieceType::WHITE_KING);
+
+        // Kingside castle
+        if (std::abs(endCol - startCol) == 2 && endCol > startCol) {
+            int row = startRow;
+            board[row][5] = isWhiteKing ? PieceType::WHITE_ROOK : PieceType::BLACK_ROOK;
+            board[row][7] = PieceType::EMPTY;
+        }
+
+        // Queenside castle
+        if (std::abs(endCol - startCol) == 2 && endCol < startCol) {
+            int row = startRow;
+            board[row][3] = isWhiteKing ? PieceType::WHITE_ROOK : PieceType::BLACK_ROOK;
+            board[row][0] = PieceType::EMPTY;
+        }
+
+        // Record that king has moved
+        if (isWhiteKing) whiteKingMoved = true;
+        else blackKingMoved = true;
+    }
+
+    // ===== ROOK MOVE TRACKING =====
+    if (movingPiece == PieceType::WHITE_ROOK) {
+        if (startRow == 7 && startCol == 0) whiteRookQueensideMoved = true;
+        if (startRow == 7 && startCol == 7) whiteRookKingsideMoved = true;
+    }
+    if (movingPiece == PieceType::BLACK_ROOK) {
+        if (startRow == 0 && startCol == 0) blackRookQueensideMoved = true;
+        if (startRow == 0 && startCol == 7) blackRookKingsideMoved = true;
+    }
+
+
+    // ====== PART 4: Switch Turn ======
+    whiteTurn = !whiteTurn;
     return true;
 }
+
+
