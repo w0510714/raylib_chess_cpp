@@ -1,7 +1,8 @@
 #include "bishop_movement.h"
 #include <cmath>
 
-bool BishopMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, PieceType board[8][8]) {
+bool BishopMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol,
+                                const PieceType board[8][8]) {
     // Diagonal Movement
     int rowDiff = std::abs(endRow - startRow);
     int colDiff = std::abs(endCol - startCol);

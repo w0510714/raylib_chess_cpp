@@ -15,7 +15,7 @@ bool KingMovement::isValidMove(
     if (rowDiff <= 1 && colDiff <= 1)
         return true;
 
-    // ==== CASTLING ====
+    // Castling move
     bool isWhite = (piece == PieceType::WHITE_KING);
     if (rowDiff == 0 && colDiff == 2 && !kingMoved) {
         // Kingside castling

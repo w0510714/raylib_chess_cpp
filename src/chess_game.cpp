@@ -61,6 +61,10 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
         return false;
     }
 
+    if (startRow == endRow && startCol == endCol) {
+        return false;
+    }
+
     PieceType movingPiece = board[startRow][startCol];
     if (movingPiece == PieceType::EMPTY) return false;
 
@@ -72,12 +76,11 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     if (!whiteTurn && isWhitePiece) return false;
 
     bool valid = false;
-
     if (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) {
         valid = pawnValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol,
                                            board, enPassantTargetRow, enPassantTargetCol);
     } else if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
-        valid = kingValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board, 
+        valid = kingValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol, board,
                                            isWhitePiece ? whiteKingMoved : blackKingMoved,
                                            isWhitePiece ? whiteRookKingsideMoved : blackRookKingsideMoved,
                                            isWhitePiece ? whiteRookQueensideMoved : blackRookQueensideMoved);
@@ -93,51 +96,96 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
 
     if (!valid) return false;
 
-    // ====== PART 1: Handle En Passant Capture ======
+    PieceType origStart = board[startRow][startCol];
+    PieceType origEnd   = board[endRow][endCol];
+
+    // For en passant captured pawn (if any)
+    bool willBeEnPassantCapture = false;
+    int capturedPawnRow = -1;
+    PieceType origCapturedPawn = PieceType::EMPTY;
     if ((movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) &&
-        endCol != startCol && board[endRow][endCol] == PieceType::EMPTY) {
-        int capturedPawnRow = isWhitePiece ? endRow + 1 : endRow - 1;
+        startCol != endCol && board[endRow][endCol] == PieceType::EMPTY) {
+        // Potential en passant capture, verify using enPassant target
+        if (endRow == enPassantTargetRow && endCol == enPassantTargetCol) {
+            willBeEnPassantCapture = true;
+            capturedPawnRow = isWhitePiece ? endRow + 1 : endRow - 1;
+            origCapturedPawn = board[capturedPawnRow][endCol];
+        }
+    }
+
+    // Castling logic
+    bool willBeCastling = false;
+    int rookSrcCol = -1, rookDstCol = -1, rookRow = -1;
+    PieceType origRookSrc = PieceType::EMPTY, origRookDst = PieceType::EMPTY;
+    if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
+        if (std::abs(endCol - startCol) == 2) {
+            willBeCastling = true;
+            rookRow = startRow;
+            if (endCol > startCol) {
+                // kingside
+                rookSrcCol = 7;
+                rookDstCol = 5;
+            } else {
+                // queenside
+                rookSrcCol = 0;
+                rookDstCol = 3;
+            }
+            origRookSrc = board[rookRow][rookSrcCol];
+            origRookDst = board[rookRow][rookDstCol];
+        }
+    }
+
+    if (willBeEnPassantCapture) {
         board[capturedPawnRow][endCol] = PieceType::EMPTY;
     }
 
-    // ====== PART 2: Move Piece ======
+    if (willBeCastling) {
+        board[rookRow][rookDstCol] = board[rookRow][rookSrcCol]; // move rook
+        board[rookRow][rookSrcCol] = PieceType::EMPTY;
+    }
+
     board[endRow][endCol] = movingPiece;
     board[startRow][startCol] = PieceType::EMPTY;
 
-    // ====== PART 3: Update En Passant Target ======
+    bool inCheck = isKingInCheck(isWhitePiece);
+
+    if (inCheck) {
+        board[startRow][startCol] = origStart;
+        board[endRow][endCol] = origEnd;
+
+        if (willBeEnPassantCapture) {
+            board[capturedPawnRow][endCol] = origCapturedPawn;
+        }
+
+        if (willBeCastling) {
+            board[rookRow][rookSrcCol] = origRookSrc;
+            board[rookRow][rookDstCol] = origRookDst;
+        }
+
+        return false;
+    }
+
     enPassantTargetRow = -1;
     enPassantTargetCol = -1;
-
     if ((movingPiece == PieceType::WHITE_PAWN && startRow - endRow == 2) ||
         (movingPiece == PieceType::BLACK_PAWN && endRow - startRow == 2)) {
         enPassantTargetRow = (startRow + endRow) / 2;
         enPassantTargetCol = startCol;
     }
 
-    // ===== CASTLING LOGIC =====
-    if (movingPiece == PieceType::WHITE_KING || movingPiece == PieceType::BLACK_KING) {
+    if (willBeCastling) {
         bool isWhiteKing = (movingPiece == PieceType::WHITE_KING);
-
-        // Kingside castle
-        if (std::abs(endCol - startCol) == 2 && endCol > startCol) {
-            int row = startRow;
-            board[row][5] = isWhiteKing ? PieceType::WHITE_ROOK : PieceType::BLACK_ROOK;
-            board[row][7] = PieceType::EMPTY;
+        if (isWhiteKing) {
+            whiteKingMoved = true;
+            if (rookSrcCol == 7) whiteRookKingsideMoved = true;
+            else if (rookSrcCol == 0) whiteRookQueensideMoved = true;
+        } else {
+            blackKingMoved = true;
+            if (rookSrcCol == 7) blackRookKingsideMoved = true;
+            else if (rookSrcCol == 0) blackRookQueensideMoved = true;
         }
-
-        // Queenside castle
-        if (std::abs(endCol - startCol) == 2 && endCol < startCol) {
-            int row = startRow;
-            board[row][3] = isWhiteKing ? PieceType::WHITE_ROOK : PieceType::BLACK_ROOK;
-            board[row][0] = PieceType::EMPTY;
-        }
-
-        // Record that king has moved
-        if (isWhiteKing) whiteKingMoved = true;
-        else blackKingMoved = true;
     }
 
-    // ===== ROOK MOVE TRACKING =====
     if (movingPiece == PieceType::WHITE_ROOK) {
         if (startRow == 7 && startCol == 0) whiteRookQueensideMoved = true;
         if (startRow == 7 && startCol == 7) whiteRookKingsideMoved = true;
@@ -147,10 +195,67 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
         if (startRow == 0 && startCol == 7) blackRookKingsideMoved = true;
     }
 
+    if (movingPiece == PieceType::WHITE_KING && !willBeCastling) whiteKingMoved = true;
+    if (movingPiece == PieceType::BLACK_KING && !willBeCastling) blackKingMoved = true;
 
-    // ====== PART 4: Switch Turn ======
     whiteTurn = !whiteTurn;
     return true;
 }
 
+
+bool ChessGame::isKingInCheck(bool whiteKing) const {
+    int kingRow = -1, kingCol = -1;
+
+    // Find the king
+    PieceType kingType = whiteKing ? PieceType::WHITE_KING : PieceType::BLACK_KING;
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            if (board[r][c] == kingType) {
+                kingRow = r;
+                kingCol = c;
+                break;
+            }
+        }
+    }
+
+    if (kingRow == -1) return false; // should never happen
+
+    // Check if any enemy piece can move to that square
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            PieceType attacker = board[r][c];
+            if (attacker == PieceType::EMPTY) continue;
+
+            bool isWhiteAttacker =
+                (attacker == PieceType::WHITE_PAWN || attacker == PieceType::WHITE_KNIGHT ||
+                 attacker == PieceType::WHITE_BISHOP || attacker == PieceType::WHITE_ROOK ||
+                 attacker == PieceType::WHITE_QUEEN || attacker == PieceType::WHITE_KING);
+
+            if (isWhiteAttacker == whiteKing) continue; // skip friendly pieces
+
+            // If this enemy could move to the king's square, it's a check
+            bool valid = false;
+            if (attacker == PieceType::WHITE_PAWN || attacker == PieceType::BLACK_PAWN)
+                valid = pawnValidator->isValidMove(attacker, r, c, kingRow, kingCol, board, -1, -1);
+            else if (attacker == PieceType::WHITE_KING || attacker == PieceType::BLACK_KING)
+                valid = kingValidator->isValidMove(attacker, r, c, kingRow, kingCol, board, 
+                                                  whiteKing ? whiteKingMoved : blackKingMoved,
+                                                  whiteKing ? whiteRookKingsideMoved : blackRookKingsideMoved,
+                                                  whiteKing ? whiteRookQueensideMoved : blackRookQueensideMoved);
+            else if (attacker == PieceType::WHITE_QUEEN || attacker == PieceType::BLACK_QUEEN)
+                valid = queenValidator->isValidMove(attacker, r, c, kingRow, kingCol, board);
+            else if (attacker == PieceType::WHITE_ROOK || attacker == PieceType::BLACK_ROOK)
+                valid = rookValidator->isValidMove(attacker, r, c, kingRow, kingCol, board);
+            else if (attacker == PieceType::WHITE_BISHOP || attacker == PieceType::BLACK_BISHOP)
+                valid = bishopValidator->isValidMove(attacker, r, c, kingRow, kingCol, board);
+            else if (attacker == PieceType::WHITE_KNIGHT || attacker == PieceType::BLACK_KNIGHT)
+                valid = knightValidator->isValidMove(attacker, r, c, kingRow, kingCol, board);
+
+            if (valid)
+                return true;
+        }
+    }
+
+    return false;
+}
 

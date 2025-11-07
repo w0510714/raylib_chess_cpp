@@ -23,6 +23,7 @@ private:
     PieceType board[8][8];
     bool whiteTurn;
     GameStatus status;
+    bool isKingInCheck(bool whiteKing) const;
     std::unique_ptr<PawnMovement> pawnValidator;
     std::unique_ptr<KingMovement> kingValidator;
     std::unique_ptr<QueenMovement> queenValidator;
