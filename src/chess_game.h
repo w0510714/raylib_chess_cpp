@@ -27,6 +27,7 @@ private:
     bool isKingInCheck(bool whiteKing) const;
     bool isCheckmate(bool whiteKing);
     bool isStalemate(bool whiteKing) const;
+    bool isInsufficientMaterial() const;
     bool gameOver = false;
     std::unique_ptr<PawnMovement> pawnValidator;
     std::unique_ptr<KingMovement> kingValidator;

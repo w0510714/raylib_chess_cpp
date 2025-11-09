@@ -227,6 +227,11 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     // Switch turn
     whiteTurn = !whiteTurn;
 
+    if (isInsufficientMaterial()) {
+        std::cout << "Draw by insufficient material!\n";
+        gameOver = true;
+    }
+
     // After move, check if opponent is checkmated
     bool opponentIsWhite = whiteTurn; // we just flipped turns
     if (isCheckmate(opponentIsWhite)) {
@@ -440,4 +445,69 @@ bool ChessGame::isStalemate(bool whiteToMove) const {
 
     // No legal moves found, and not in check → stalemate
     return true;
+}
+
+bool ChessGame::isInsufficientMaterial() const {
+    // Collect piece counts
+    int whitePieces = 0, blackPieces = 0;
+    int whiteBishops = 0, blackBishops = 0;
+    int whiteKnights = 0, blackKnights = 0;
+
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            PieceType p = board[r][c];
+            switch (p) {
+                case PieceType::WHITE_PAWN:
+                case PieceType::BLACK_PAWN:
+                case PieceType::WHITE_ROOK:
+                case PieceType::BLACK_ROOK:
+                case PieceType::WHITE_QUEEN:
+                case PieceType::BLACK_QUEEN:
+                    // Any of these pieces means sufficient material exists
+                    return false;
+
+                case PieceType::WHITE_BISHOP:
+                    whiteBishops++;
+                    break;
+                case PieceType::BLACK_BISHOP:
+                    blackBishops++;
+                    break;
+                case PieceType::WHITE_KNIGHT:
+                    whiteKnights++;
+                    break;
+                case PieceType::BLACK_KNIGHT:
+                    blackKnights++;
+                    break;
+
+                default:
+                    break;
+            }
+
+            // Track total non-king pieces
+            if (p != PieceType::EMPTY && p != PieceType::WHITE_KING)
+                whitePieces += (p >= PieceType::WHITE_PAWN && p <= PieceType::WHITE_KING);
+            if (p != PieceType::EMPTY && p != PieceType::BLACK_KING)
+                blackPieces += (p >= PieceType::BLACK_PAWN && p <= PieceType::BLACK_KING);
+        }
+    }
+
+    // King vs King
+    if (whitePieces == 0 && blackPieces == 0)
+        return true;
+
+    // King + Bishop vs King
+    if ((whiteBishops == 1 && whitePieces == 1 && blackPieces == 0) ||
+        (blackBishops == 1 && blackPieces == 1 && whitePieces == 0))
+        return true;
+
+    // King + Knight vs King
+    if ((whiteKnights == 1 && whitePieces == 1 && blackPieces == 0) ||
+        (blackKnights == 1 && blackPieces == 1 && whitePieces == 0))
+        return true;
+
+    // King + Bishop vs King + Bishop on same color squares — optional advanced check
+    if (whiteBishops == 1 && blackBishops == 1 && whitePieces == 1 && blackPieces == 1)
+        return true;
+
+    return false;
 }
