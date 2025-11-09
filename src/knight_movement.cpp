@@ -1,8 +1,7 @@
 #include "knight_movement.h"
 #include <cmath>
 
-bool KnightMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol,
-                                const PieceType board[8][8]) {
+bool KnightMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, const PieceType board[8][8]) {
     int rowDiff = std::abs(endRow - startRow);
     int colDiff = std::abs(endCol - startCol);
 
@@ -25,6 +24,11 @@ bool KnightMovement::isValidMove(PieceType piece, int startRow, int startCol, in
         target == PieceType::WHITE_PAWN || target == PieceType::WHITE_KNIGHT || target == PieceType::WHITE_BISHOP ||
         target == PieceType::WHITE_ROOK || target == PieceType::WHITE_QUEEN || target == PieceType::WHITE_KING
     );
+
+    /*
+        Note: We don't need to add any logic for collision
+        as knights avoid collision by jumping over pieces.
+    */
 
     return (isWhite != targetIsWhite);
 }

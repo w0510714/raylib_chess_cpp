@@ -1,8 +1,7 @@
 #include "rook_movement.h"
 #include <cmath>
 
-bool RookMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol,
-                                const PieceType board[8][8]) {
+bool RookMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, const PieceType board[8][8]) {
     // Rook moves in straight lines: either same row or same column
     if (startRow != endRow && startCol != endCol) return false;
 

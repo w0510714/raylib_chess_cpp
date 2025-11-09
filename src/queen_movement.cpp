@@ -1,8 +1,7 @@
 #include "queen_movement.h"
 #include <cmath>
 
-bool QueenMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol,
-                                const PieceType board[8][8]) {
+bool QueenMovement::isValidMove(PieceType piece, int startRow, int startCol, int endRow, int endCol, const PieceType board[8][8]) {
     // Calculate differences for vertical, horizontal, diagonal movements
     int rowDiff = std::abs(endRow - startRow);
     int colDiff = std::abs(endCol - startCol);

@@ -1,5 +1,5 @@
 #include "pawn_movement.h"
-#include <cstdlib> // for std::abs
+#include <cstdlib>
 
 bool PawnMovement::isValidMove(
     PieceType piece,
@@ -22,7 +22,7 @@ bool PawnMovement::isValidMove(
     int colDiff = endCol - startCol;
     PieceType target = board[endRow][endCol];
 
-    // ====== Forward Move ======
+    // Forward Move
     if (colDiff == 0) {
         if (rowDiff == direction && target == PieceType::EMPTY)
             return true;
@@ -34,7 +34,7 @@ bool PawnMovement::isValidMove(
         return false;
     }
 
-    // ====== Diagonal Capture or En Passant ======
+    //Diagonal Capture or En Passant
     if (std::abs(colDiff) == 1 && rowDiff == direction) {
         // Regular capture
         bool targetIsWhite =
