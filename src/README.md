@@ -17,5 +17,6 @@
 #   Visually saying what game state it is (checkmate)
 #   Highlighted (orange/red) for check and pinned pieces
 #   Changing the chess pieces and board
+#   Threefold repetition (was removed from requirements)
 #
 # I just wanted the neccesities done first
