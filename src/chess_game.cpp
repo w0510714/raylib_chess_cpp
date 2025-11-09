@@ -223,6 +223,9 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     if (isCheckmate(opponentIsWhite)) {
         std::cout << (opponentIsWhite ? "White" : "Black") << " is checkmated!\n";
         gameOver = true;
+    } else if (isStalemate(opponentIsWhite)) {
+        std::cout << "Stalemate! The game is a draw.\n";
+        gameOver = true;
     }
 
     return true;
@@ -349,5 +352,83 @@ bool ChessGame::isCheckmate(bool whiteKing) {
     }
 
     // No move could escape check → checkmate
+    return true;
+}
+
+bool ChessGame::isStalemate(bool whiteToMove) const {
+    // If the player is currently in check, it's not stalemate
+    if (isKingInCheck(whiteToMove)) return false;
+
+    // Try every piece of this color
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            PieceType piece = board[r][c];
+            if (piece == PieceType::EMPTY) continue;
+
+            bool isWhitePiece =
+                (piece == PieceType::WHITE_PAWN || piece == PieceType::WHITE_KNIGHT ||
+                 piece == PieceType::WHITE_BISHOP || piece == PieceType::WHITE_ROOK ||
+                 piece == PieceType::WHITE_QUEEN || piece == PieceType::WHITE_KING);
+
+            // Skip enemy pieces
+            if (isWhitePiece != whiteToMove) continue;
+
+            // Test all 64 squares for any legal move
+            for (int endR = 0; endR < 8; ++endR) {
+                for (int endC = 0; endC < 8; ++endC) {
+                    if (r == endR && c == endC) continue;
+
+                    bool valid = false;
+
+                    // Validate move by piece type
+                    if (piece == PieceType::WHITE_PAWN || piece == PieceType::BLACK_PAWN)
+                        valid = pawnValidator->isValidMove(piece, r, c, endR, endC, board, -1, -1);
+                    else if (piece == PieceType::WHITE_KING || piece == PieceType::BLACK_KING)
+                        valid = kingValidator->isValidMove(piece, r, c, endR, endC, board,
+                                                            isWhitePiece ? whiteKingMoved : blackKingMoved,
+                                                            isWhitePiece ? whiteRookKingsideMoved : blackRookKingsideMoved,
+                                                            isWhitePiece ? whiteRookQueensideMoved : blackRookQueensideMoved);
+                    else if (piece == PieceType::WHITE_QUEEN || piece == PieceType::BLACK_QUEEN)
+                        valid = queenValidator->isValidMove(piece, r, c, endR, endC, board);
+                    else if (piece == PieceType::WHITE_ROOK || piece == PieceType::BLACK_ROOK)
+                        valid = rookValidator->isValidMove(piece, r, c, endR, endC, board);
+                    else if (piece == PieceType::WHITE_BISHOP || piece == PieceType::BLACK_BISHOP)
+                        valid = bishopValidator->isValidMove(piece, r, c, endR, endC, board);
+                    else if (piece == PieceType::WHITE_KNIGHT || piece == PieceType::BLACK_KNIGHT)
+                        valid = knightValidator->isValidMove(piece, r, c, endR, endC, board);
+
+                    if (!valid) continue;
+
+                    // Prevent capturing own piece
+                    PieceType target = board[endR][endC];
+                    bool targetIsWhite =
+                        (target == PieceType::WHITE_PAWN || target == PieceType::WHITE_KNIGHT ||
+                         target == PieceType::WHITE_BISHOP || target == PieceType::WHITE_ROOK ||
+                         target == PieceType::WHITE_QUEEN || target == PieceType::WHITE_KING);
+
+                    if (target != PieceType::EMPTY && targetIsWhite == isWhitePiece)
+                        continue;
+
+                    // Simulate move
+                    PieceType backupStart = board[r][c];
+                    PieceType backupEnd = board[endR][endC];
+                    const_cast<PieceType(&)[8][8]>(board)[endR][endC] = piece;
+                    const_cast<PieceType(&)[8][8]>(board)[r][c] = PieceType::EMPTY;
+
+                    bool stillInCheck = isKingInCheck(whiteToMove);
+
+                    // Undo move
+                    const_cast<PieceType(&)[8][8]>(board)[r][c] = backupStart;
+                    const_cast<PieceType(&)[8][8]>(board)[endR][endC] = backupEnd;
+
+                    if (!stillInCheck) {
+                        return false; // Found at least one legal move
+                    }
+                }
+            }
+        }
+    }
+
+    // No legal moves found, and not in check → stalemate
     return true;
 }
