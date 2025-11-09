@@ -24,11 +24,14 @@ private:
     PieceType board[8][8];
     bool whiteTurn;
     GameStatus status;
+    bool gameOver = false;
+
     bool isKingInCheck(bool whiteKing) const;
     bool isCheckmate(bool whiteKing);
     bool isStalemate(bool whiteKing) const;
     bool isInsufficientMaterial() const;
-    bool gameOver = false;
+    bool isFiftyMoveRuleReached() const;
+
     std::unique_ptr<PawnMovement> pawnValidator;
     std::unique_ptr<KingMovement> kingValidator;
     std::unique_ptr<QueenMovement> queenValidator;
@@ -38,6 +41,7 @@ private:
 
     int enPassantTargetRow = -1;
     int enPassantTargetCol = -1;
+    int halfMoveClock = 0;
 
     bool whiteKingMoved = false;
     bool blackKingMoved = false;
@@ -45,7 +49,6 @@ private:
     bool whiteRookQueensideMoved = false;
     bool blackRookKingsideMoved = false;
     bool blackRookQueensideMoved = false;
-
 
     void initializeBoard();
 };

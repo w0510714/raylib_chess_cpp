@@ -3,7 +3,7 @@
 #include <cstring>
 #include <iostream>
 
-ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING) {
+ChessGame::ChessGame() : whiteTurn(true), status(GameStatus::ONGOING), halfMoveClock(0) {
     initializeBoard();
     std::unique_ptr<MoveValidator> pawnValidator;
     std::unique_ptr<MoveValidator> kingValidator;
@@ -81,6 +81,7 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     if (whiteTurn && !isWhitePiece) return false;
     if (!whiteTurn && isWhitePiece) return false;
 
+    // Validate move according to piece type
     bool valid = false;
     if (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN) {
         valid = pawnValidator->isValidMove(movingPiece, startRow, startCol, endRow, endCol,
@@ -157,12 +158,22 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     }
 
     if (willBeCastling) {
-        board[rookRow][rookDstCol] = board[rookRow][rookSrcCol]; // move rook
+        board[rookRow][rookDstCol] = board[rookRow][rookSrcCol]; // move rook logic for castling
         board[rookRow][rookSrcCol] = PieceType::EMPTY;
     }
 
     board[endRow][endCol] = movingPiece;
     board[startRow][startCol] = PieceType::EMPTY;
+
+    // 50-move rule counter
+    if (movingPiece == PieceType::WHITE_PAWN || movingPiece == PieceType::BLACK_PAWN || target != PieceType::EMPTY) {
+        // Pawn move or capture — reset
+        halfMoveClock = 0;
+    } else {
+        // Otherwise, increment
+        halfMoveClock++;
+    }
+
 
     // Pawn Promotion
     if (movingPiece == PieceType::WHITE_PAWN && endRow == 0) {
@@ -229,6 +240,9 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
 
     if (isInsufficientMaterial()) {
         std::cout << "Draw by insufficient material!\n";
+        gameOver = true;
+    } else if (isFiftyMoveRuleReached()) {
+        std::cout << "Draw by fifty-move rule!\n";
         gameOver = true;
     }
 
@@ -303,11 +317,11 @@ bool ChessGame::isKingInCheck(bool whiteKing) const {
 }
 
 bool ChessGame::isCheckmate(bool whiteKing) {
-    // 1. If the king is NOT in check, it’s not checkmate
+    // If the king is not in check, it’s not checkmate
     if (!isKingInCheck(whiteKing))
         return false;
 
-    // 2. Try every possible move for every piece of this color
+    // Trying every possible move for every piece of this color
     for (int startRow = 0; startRow < 8; ++startRow) {
         for (int startCol = 0; startCol < 8; ++startCol) {
             PieceType piece = board[startRow][startCol];
@@ -328,7 +342,7 @@ bool ChessGame::isCheckmate(bool whiteKing) {
 
                     bool valid = false;
 
-                    // Use the same logic you use in makeMove
+                    // Same logic I used in makeMove - I could turn this into a helper function later
                     if (piece == PieceType::WHITE_PAWN || piece == PieceType::BLACK_PAWN)
                         valid = pawnValidator->isValidMove(piece, startRow, startCol, endRow, endCol, board, -1, -1);
                     else if (piece == PieceType::WHITE_KING || piece == PieceType::BLACK_KING)
@@ -365,7 +379,7 @@ bool ChessGame::isCheckmate(bool whiteKing) {
         }
     }
 
-    // No move could escape check → checkmate
+    // No move could escape check = checkmate
     return true;
 }
 
@@ -394,7 +408,7 @@ bool ChessGame::isStalemate(bool whiteToMove) const {
 
                     bool valid = false;
 
-                    // Validate move by piece type
+                    // Validate move by piece type (duplicated from makeMove)
                     if (piece == PieceType::WHITE_PAWN || piece == PieceType::BLACK_PAWN)
                         valid = pawnValidator->isValidMove(piece, r, c, endR, endC, board, -1, -1);
                     else if (piece == PieceType::WHITE_KING || piece == PieceType::BLACK_KING)
@@ -510,4 +524,8 @@ bool ChessGame::isInsufficientMaterial() const {
         return true;
 
     return false;
+}
+
+bool ChessGame::isFiftyMoveRuleReached() const {
+    return halfMoveClock >= 100; // 100 half-moves = 50 full moves
 }

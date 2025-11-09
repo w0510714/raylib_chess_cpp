@@ -118,7 +118,7 @@ void ChessAnalysisProgram::renderBoard(){
 void ChessAnalysisProgram::renderPieces() {
     float boardScale = GetScreenHeight() / (float)boardTexture.height;
     float squareSize = (boardTexture.width * boardScale) / 8.0f;
-    float pieceScale = boardScale * 1.0f;  // Slightly smaller than the square for better fit
+    float pieceScale = boardScale * 1.0f;
     float pieceOffset = (squareSize - (pieceScale * boardTexture.width / 10.5f)) / 2.0f;
 
     for (int row = 0; row < 8; ++row) {
@@ -206,7 +206,6 @@ void ChessAnalysisProgram::updateGame() {
             newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
             if (!currentPosition.makeMove(dragRow, dragCol, newRow, newCol)) {
                 // If move fails, the piece should already be in its original position
-                // because makeMove() didn't modify the board
             }
         }
         
