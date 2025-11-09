@@ -164,6 +164,15 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
     board[endRow][endCol] = movingPiece;
     board[startRow][startCol] = PieceType::EMPTY;
 
+    // Pawn Promotion
+    if (movingPiece == PieceType::WHITE_PAWN && endRow == 0) {
+        board[endRow][endCol] = PieceType::WHITE_QUEEN; // Promote to queen by default
+    }
+    else if (movingPiece == PieceType::BLACK_PAWN && endRow == 7) {
+        board[endRow][endCol] = PieceType::BLACK_QUEEN; // Promote to queen by default
+    }
+
+
     bool inCheck = isKingInCheck(isWhitePiece);
 
     if (inCheck) {

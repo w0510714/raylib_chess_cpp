@@ -1,6 +1,6 @@
 #pragma once
 
-#include <raylib.h>
+#include "raylib.h"
 #include "chess_game.h"
 #include "chess_game_enums.h"
 
@@ -26,6 +26,7 @@ private:
     Texture2D blackPawnTexture;
 
     ChessGame currentPosition;
+    ChessGame game; // For later
 
     // Drag and drop state
     bool dragging = false;
