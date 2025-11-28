@@ -1,54 +1,59 @@
-#pragma once
-#include "move_validator.h"
-#include "pawn_movement.h"
-#include "king_movement.h"
-#include "queen_movement.h"
-#include "rook_movement.h"
-#include "bishop_movement.h"
-#include "knight_movement.h"
 #include "chess_game_enums.h"
+#include <cmath>
 #include <memory>
+
 
 class ChessGame {
 public:
-    ChessGame();
-    ~ChessGame() = default;
+  ChessGame();
+  ~ChessGame() = default;
 
-    PieceType getPieceAt(int row, int col) const;
-    bool makeMove(int startRow, int startCol, int endRow, int endCol);
-    GameStatus getGameStatus() const { return status; }
-    bool isWhiteTurn() const { return whiteTurn; }
-    bool isGameOver() const { return gameOver; }
+  PieceType getPieceAt(int row, int col) const;
+  bool makeMove(int startRow, int startCol, int endRow, int endCol);
+  GameStatus getGameStatus() const { return status; }
+  bool isWhiteTurn() const { return whiteTurn; }
+  bool isGameOver() const { return gameOver; }
 
 private:
-    PieceType board[8][8];
-    bool whiteTurn;
-    GameStatus status;
-    bool gameOver = false;
+  PieceType board[8][8];
+  bool whiteTurn;
+  GameStatus status;
+  bool gameOver = false;
 
-    bool isKingInCheck(bool whiteKing) const;
-    bool isCheckmate(bool whiteKing);
-    bool isStalemate(bool whiteKing) const;
-    bool isInsufficientMaterial() const;
-    bool isFiftyMoveRuleReached() const;
+  bool isKingInCheck(bool whiteKing) const;
+  bool isCheckmate(bool whiteKing);
+  bool isStalemate(bool whiteKing) const;
+  bool isInsufficientMaterial() const;
+  bool isFiftyMoveRuleReached() const;
 
-    std::unique_ptr<PawnMovement> pawnValidator;
-    std::unique_ptr<KingMovement> kingValidator;
-    std::unique_ptr<QueenMovement> queenValidator;
-    std::unique_ptr<RookMovement> rookValidator;
-    std::unique_ptr<BishopMovement> bishopValidator;
-    std::unique_ptr<KnightMovement> knightValidator;
+  // Move Validation Helpers
+  bool isValidPawnMove(PieceType piece, int startRow, int startCol, int endRow,
+                       int endCol, const PieceType board[8][8],
+                       int enPassantTargetRow, int enPassantTargetCol) const;
+  bool isValidKingMove(PieceType piece, int startRow, int startCol, int endRow,
+                       int endCol, const PieceType board[8][8], bool kingMoved,
+                       bool rookKingsideMoved, bool rookQueensideMoved) const;
+  bool isValidQueenMove(PieceType piece, int startRow, int startCol, int endRow,
+                        int endCol, const PieceType board[8][8]) const;
+  bool isValidRookMove(PieceType piece, int startRow, int startCol, int endRow,
+                       int endCol, const PieceType board[8][8]) const;
+  bool isValidBishopMove(PieceType piece, int startRow, int startCol,
+                         int endRow, int endCol,
+                         const PieceType board[8][8]) const;
+  bool isValidKnightMove(PieceType piece, int startRow, int startCol,
+                         int endRow, int endCol,
+                         const PieceType board[8][8]) const;
 
-    int enPassantTargetRow = -1;
-    int enPassantTargetCol = -1;
-    int halfMoveClock = 0;
+  int enPassantTargetRow = -1;
+  int enPassantTargetCol = -1;
+  int halfMoveClock = 0;
 
-    bool whiteKingMoved = false;
-    bool blackKingMoved = false;
-    bool whiteRookKingsideMoved = false;
-    bool whiteRookQueensideMoved = false;
-    bool blackRookKingsideMoved = false;
-    bool blackRookQueensideMoved = false;
+  bool whiteKingMoved = false;
+  bool blackKingMoved = false;
+  bool whiteRookKingsideMoved = false;
+  bool whiteRookQueensideMoved = false;
+  bool blackRookKingsideMoved = false;
+  bool blackRookQueensideMoved = false;
 
-    void initializeBoard();
+  void initializeBoard();
 };
