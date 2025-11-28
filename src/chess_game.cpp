@@ -1,11 +1,30 @@
 #include "chess_game.h"
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 ChessGame::ChessGame()
     : whiteTurn(true), status(GameStatus::ONGOING), halfMoveClock(0) {
-  initializeBoard();
+  // Try to load position from FEN file
+  std::ifstream fenFile("src/initial_position.fen");
+  bool loadedFromFile = false;
+
+  if (fenFile.is_open()) {
+    std::string fenString;
+    if (std::getline(fenFile, fenString)) {
+      std::cout << "Found initial_position.fen, attempting to load...\n";
+      loadedFromFile = loadFromFEN(fenString.c_str());
+    }
+    fenFile.close();
+  }
+
+  // If FEN loading failed or file doesn't exist, use standard starting position
+  if (!loadedFromFile) {
+    std::cout << "Loading standard starting position\n";
+    initializeBoard();
+  }
 }
 
 void ChessGame::initializeBoard() {
@@ -871,4 +890,171 @@ bool ChessGame::isValidKnightMove(PieceType piece, int startRow, int startCol,
   */
 
   return (isWhite != targetIsWhite);
+}
+
+bool ChessGame::loadFromFEN(const char *fen) {
+  if (!fen || strlen(fen) == 0) {
+    std::cout << "Invalid FEN string (empty or null)\n";
+    return false;
+  }
+
+  // Clear the board first
+  for (int row = 0; row < 8; ++row) {
+    for (int col = 0; col < 8; ++col) {
+      board[row][col] = PieceType::EMPTY;
+    }
+  }
+
+  // Parse FEN string
+  std::istringstream iss(fen);
+  std::string piecePlacement, activeColor, castlingRights, enPassant;
+  int halfmove = 0, fullmove = 1;
+
+  // Read the 6 fields of FEN notation
+  iss >> piecePlacement >> activeColor >> castlingRights >> enPassant >>
+      halfmove >> fullmove;
+
+  // Parse piece placement (first field)
+  int row = 0, col = 0;
+  for (char c : piecePlacement) {
+    if (c == '/') {
+      row++;
+      col = 0;
+      if (row > 7) {
+        std::cout << "Invalid FEN: too many ranks\n";
+        return false;
+      }
+    } else if (c >= '1' && c <= '8') {
+      // Empty squares
+      int emptySquares = c - '0';
+      col += emptySquares;
+      if (col > 8) {
+        std::cout << "Invalid FEN: too many files in rank\n";
+        return false;
+      }
+    } else {
+      // Piece character
+      if (col >= 8) {
+        std::cout << "Invalid FEN: too many pieces in rank\n";
+        return false;
+      }
+
+      PieceType piece = PieceType::EMPTY;
+      switch (c) {
+      case 'P':
+        piece = PieceType::WHITE_PAWN;
+        break;
+      case 'N':
+        piece = PieceType::WHITE_KNIGHT;
+        break;
+      case 'B':
+        piece = PieceType::WHITE_BISHOP;
+        break;
+      case 'R':
+        piece = PieceType::WHITE_ROOK;
+        break;
+      case 'Q':
+        piece = PieceType::WHITE_QUEEN;
+        break;
+      case 'K':
+        piece = PieceType::WHITE_KING;
+        break;
+      case 'p':
+        piece = PieceType::BLACK_PAWN;
+        break;
+      case 'n':
+        piece = PieceType::BLACK_KNIGHT;
+        break;
+      case 'b':
+        piece = PieceType::BLACK_BISHOP;
+        break;
+      case 'r':
+        piece = PieceType::BLACK_ROOK;
+        break;
+      case 'q':
+        piece = PieceType::BLACK_QUEEN;
+        break;
+      case 'k':
+        piece = PieceType::BLACK_KING;
+        break;
+      default:
+        std::cout << "Invalid FEN: unknown piece character '" << c << "'\n";
+        return false;
+      }
+      board[row][col] = piece;
+      col++;
+    }
+  }
+
+  // Parse active color (second field)
+  if (activeColor == "w") {
+    whiteTurn = true;
+  } else if (activeColor == "b") {
+    whiteTurn = false;
+  } else {
+    std::cout << "Invalid FEN: invalid active color\n";
+    return false;
+  }
+
+  // Parse castling rights (third field)
+  whiteKingMoved = true;
+  blackKingMoved = true;
+  whiteRookKingsideMoved = true;
+  whiteRookQueensideMoved = true;
+  blackRookKingsideMoved = true;
+  blackRookQueensideMoved = true;
+
+  if (castlingRights != "-") {
+    for (char c : castlingRights) {
+      switch (c) {
+      case 'K':
+        whiteKingMoved = false;
+        whiteRookKingsideMoved = false;
+        break;
+      case 'Q':
+        whiteKingMoved = false;
+        whiteRookQueensideMoved = false;
+        break;
+      case 'k':
+        blackKingMoved = false;
+        blackRookKingsideMoved = false;
+        break;
+      case 'q':
+        blackKingMoved = false;
+        blackRookQueensideMoved = false;
+        break;
+      default:
+        std::cout << "Invalid FEN: unknown castling character '" << c << "'\n";
+        return false;
+      }
+    }
+  }
+
+  // Parse en passant target square (fourth field)
+  enPassantTargetRow = -1;
+  enPassantTargetCol = -1;
+  if (enPassant != "-") {
+    if (enPassant.length() == 2) {
+      char file = enPassant[0];
+      char rank = enPassant[1];
+      if (file >= 'a' && file <= 'h' && rank >= '1' && rank <= '8') {
+        enPassantTargetCol = file - 'a';
+        enPassantTargetRow = 8 - (rank - '0');
+      } else {
+        std::cout << "Invalid FEN: invalid en passant square\n";
+        return false;
+      }
+    } else {
+      std::cout << "Invalid FEN: malformed en passant square\n";
+      return false;
+    }
+  }
+
+  // Parse halfmove clock (fifth field)
+  halfMoveClock = halfmove;
+
+  // Fullmove number (sixth field) - we don't track this currently
+
+  std::cout << "Successfully loaded position from FEN\n";
+  return true;
 }

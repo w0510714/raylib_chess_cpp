@@ -13,6 +13,7 @@ public:
   GameStatus getGameStatus() const { return status; }
   bool isWhiteTurn() const { return whiteTurn; }
   bool isGameOver() const { return gameOver; }
+  void initializeBoard();
 
 private:
   PieceType board[8][8];
@@ -55,5 +56,5 @@ private:
   bool blackRookKingsideMoved = false;
   bool blackRookQueensideMoved = false;
 
-  void initializeBoard();
+  bool loadFromFEN(const char* fen);
 };

@@ -1,6 +1,7 @@
 #include "chess_analysis_program.h"
 #include <raylib.h>
-
+#include <regex>
+#include <sstream>
 
 ChessAnalysisProgram::ChessAnalysisProgram() {
   // Initialization
@@ -14,6 +15,14 @@ ChessAnalysisProgram::ChessAnalysisProgram() {
   // Load textures after window creation (some platforms require an OpenGL
   // context)
   loadAllTextures();
+
+  // Initialize UCI engine (disabled by default)
+  // Update this path to point to your Stockfish executable
+  uciEngine = std::make_unique<UCIEngine>("src/stockfish/stockfish.exe");
+
+  // Set starting FEN (standard starting position)
+  startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  moveHistory.clear();
 }
 
 ChessAnalysisProgram::~ChessAnalysisProgram() {
@@ -213,6 +222,23 @@ void ChessAnalysisProgram::updateGame() {
   int col = static_cast<int>(mousePos.x / squareSize);
   int row = static_cast<int>(mousePos.y / squareSize);
 
+  // Check for X key press to toggle engine
+  if (IsKeyPressed(KEY_X)) {
+    if (uciEngine->isEnabled()) {
+      uciEngine->disable();
+      TraceLog(LOG_INFO, "UCI Engine disabled");
+    } else {
+      uciEngine->enable();
+      updateEnginePosition();
+      TraceLog(LOG_INFO, "UCI Engine enabled");
+    }
+  }
+
+  // Poll engine analysis if enabled
+  if (uciEngine->isEnabled()) {
+    currentAnalysis = uciEngine->pollAnalysis();
+  }
+
   if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
     if (row >= 0 && row < 8 && col >= 0 &&
         col < 8) { // Make sure we're clicking within the board
@@ -245,8 +271,16 @@ void ChessAnalysisProgram::updateGame() {
     // board
     if (dragRow >= 0 && dragRow < 8 && dragCol >= 0 && dragCol < 8 &&
         newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-      if (!currentPosition.makeMove(dragRow, dragCol, newRow, newCol)) {
-        // If move fails, the piece should already be in its original position
+      if (currentPosition.makeMove(dragRow, dragCol, newRow, newCol)) {
+        // Move was successful - add to move history
+        std::string move =
+            moveToAlgebraic(dragRow, dragCol, newRow, newCol, draggedPiece);
+        moveHistory.push_back(move);
+
+        // Update engine position if enabled
+        if (uciEngine->isEnabled()) {
+          updateEnginePosition();
+        }
       }
     }
 
@@ -260,6 +294,7 @@ void ChessAnalysisProgram::renderGame() {
   ClearBackground(RAYWHITE);
   renderBoard();
   renderPieces();
+  renderEngineAnalysis();
   EndDrawing();
 }
 
@@ -267,5 +302,148 @@ void ChessAnalysisProgram::run() {
   while (!WindowShouldClose()) {
     updateGame();
     renderGame();
+  }
+}
+
+// UCI Engine helper methods
+
+void ChessAnalysisProgram::updateEnginePosition() {
+  if (uciEngine && uciEngine->isEnabled()) {
+    uciEngine->setPosition(startingFen, moveHistory);
+  }
+}
+
+std::string ChessAnalysisProgram::moveToAlgebraic(int startRow, int startCol,
+                                                  int endRow, int endCol,
+                                                  PieceType piece) {
+  // Convert to UCI format (e.g., "e2e4")
+  char startFile = 'a' + startCol;
+  char startRank = '8' - startRow;
+  char endFile = 'a' + endCol;
+  char endRank = '8' - endRow;
+
+  std::string move;
+  move += startFile;
+  move += startRank;
+  move += endFile;
+  move += endRank;
+
+  // Handle pawn promotion (always promote to queen for simplicity)
+  if ((piece == PieceType::WHITE_PAWN && endRow == 0) ||
+      (piece == PieceType::BLACK_PAWN && endRow == 7)) {
+    move += 'q';
+  }
+
+  return move;
+}
+
+std::string ChessAnalysisProgram::parseEvaluation(const std::string &infoLine) {
+  // Parse evaluation from info line
+  // Look for "cp" (centipawns) or "mate"
+  std::regex cpRegex(R"(cp\s+(-?\d+))");
+  std::regex mateRegex(R"(mate\s+(-?\d+))");
+  std::smatch match;
+
+  if (std::regex_search(infoLine, match, mateRegex)) {
+    int mateIn = std::stoi(match[1]);
+    return "Mate in " + std::to_string(std::abs(mateIn));
+  } else if (std::regex_search(infoLine, match, cpRegex)) {
+    int centipawns = std::stoi(match[1]);
+    double pawns = centipawns / 100.0;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "%+.2f", pawns);
+    return std::string(buffer);
+  }
+
+  return "N/A";
+}
+
+std::string ChessAnalysisProgram::parseDepth(const std::string &infoLine) {
+  // Parse depth and selective depth
+  std::regex depthRegex(R"(depth\s+(\d+))");
+  std::regex seldepthRegex(R"(seldepth\s+(\d+))");
+  std::smatch match;
+
+  std::string result;
+  if (std::regex_search(infoLine, match, depthRegex)) {
+    result = "D" + match[1].str();
+  }
+
+  if (std::regex_search(infoLine, match, seldepthRegex)) {
+    if (!result.empty())
+      result += "/";
+    result += "SD" + match[1].str();
+  }
+
+  return result.empty() ? "N/A" : result;
+}
+
+std::string ChessAnalysisProgram::parsePV(const std::string &infoLine) {
+  // Parse principal variation
+  size_t pvPos = infoLine.find(" pv ");
+  if (pvPos != std::string::npos) {
+    std::string pv = infoLine.substr(pvPos + 4);
+    // Limit to first 5 moves for display
+    std::istringstream iss(pv);
+    std::string move;
+    std::string result;
+    int count = 0;
+    while (iss >> move && count < 5) {
+      if (count > 0)
+        result += " ";
+      result += move;
+      count++;
+    }
+    return result;
+  }
+  return "N/A";
+}
+
+void ChessAnalysisProgram::renderEngineAnalysis() {
+  if (!uciEngine || !uciEngine->isEnabled()) {
+    // Draw disabled indicator
+    DrawText("Engine: OFF (Press X to enable)", 1100, 20, 20, DARKGRAY);
+    return;
+  }
+
+  // Draw enabled indicator
+  DrawText("Engine: ON (Press X to disable)", 1100, 20, 20, GREEN);
+
+  // Check if we have analysis results
+  if (!currentAnalysis.hasResult) {
+    DrawText("Analyzing...", 1100, 50, 18, GRAY);
+    return;
+  }
+
+  // Display analysis lines
+  int yPos = 60;
+  int lineHeight = 80;
+
+  for (size_t i = 0; i < currentAnalysis.lines.size() && i < 4; i++) {
+    const auto &line = currentAnalysis.lines[i];
+
+    // Parse the info line
+    std::string eval = parseEvaluation(line.text);
+    std::string depth = parseDepth(line.text);
+    std::string pv = parsePV(line.text);
+
+    // Draw line number
+    DrawText(TextFormat("Line %d:", line.multipv), 1100, yPos, 18, DARKBLUE);
+
+    // Draw evaluation
+    Color evalColor = (eval[0] == '+')   ? DARKGREEN
+                      : (eval[0] == '-') ? RED
+                                         : GRAY;
+    DrawText(TextFormat("Eval: %s", eval.c_str()), 1100, yPos + 20, 16,
+             evalColor);
+
+    // Draw depth
+    DrawText(TextFormat("Depth: %s", depth.c_str()), 1100, yPos + 40, 14,
+             DARKGRAY);
+
+    // Draw PV
+    DrawText(TextFormat("PV: %s", pv.c_str()), 1100, yPos + 58, 14, BLACK);
+
+    yPos += lineHeight;
   }
 }
