@@ -8,6 +8,13 @@
 #include <string>
 #include <vector>
 
+// Structure to track individual moves
+struct Move {
+  std::string algebraic;        // Move in algebraic notation (e.g., "e2e4")
+  std::string sanNotation;      // Standard Algebraic Notation (e.g., "e4")
+  int moveNumber;               // Full move number (1, 2, 3, ...)
+  bool isWhiteMove;             // true if white played this move
+};
 
 class ChessAnalysisProgram {
 public:
@@ -43,16 +50,16 @@ private:
   // UCI Engine integration
   std::unique_ptr<UCIEngine> uciEngine;
   std::string startingFen;
-  std::vector<std::string> moveHistory;
+  std::vector<Move> moveHistory;
   EngineAnalysis currentAnalysis;
 
-  // Loads textures for board and pieces
   void renderGame();
   void updateGame();
   void renderUI();
   void renderBoard();
   void renderPieces();
   void renderEngineAnalysis();
+  void renderMoveHistory();
   void getTextureForPiece();
   void loadAllTextures();
   void unloadAllTextures();
@@ -65,4 +72,5 @@ private:
   std::string parseEvaluation(const std::string &infoLine);
   std::string parseDepth(const std::string &infoLine);
   std::string parsePV(const std::string &infoLine);
+  void addMoveToHistory(const std::string &algebraic, const std::string &san);
 };

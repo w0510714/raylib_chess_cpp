@@ -249,6 +249,32 @@ void ChessAnalysisProgram::updateGame() {
     }
   }
 
+  if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_U)) {
+    if (!moveHistory.empty()) {
+      // Undo last move
+      moveHistory.pop_back();
+      currentPosition.initializeBoard();
+      currentPosition.setWhiteTurn(true);
+      
+      // Replay all moves except the last one
+      for (const auto& move : moveHistory) {
+        // Parse and replay move from algebraic notation
+        int startCol = move.algebraic[0] - 'a';
+        int startRow = 8 - (move.algebraic[1] - '0');
+        int endCol = move.algebraic[2] - 'a';
+        int endRow = 8 - (move.algebraic[3] - '0');
+        currentPosition.makeMove(startRow, startCol, endRow, endCol);
+      }
+      
+      // Update engine position if enabled
+      if (uciEngine->isEnabled()) {
+        updateEnginePosition();
+      }
+      
+      TraceLog(LOG_INFO, "Move undone");
+    }
+  }
+
   // Poll engine analysis if enabled
   if (uciEngine->isEnabled()) {
     currentAnalysis = uciEngine->pollAnalysis();
@@ -288,9 +314,10 @@ void ChessAnalysisProgram::updateGame() {
         newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
       if (currentPosition.makeMove(dragRow, dragCol, newRow, newCol)) {
         // Move was successful - add to move history
-        std::string move =
+        std::string algebraic =
             moveToAlgebraic(dragRow, dragCol, newRow, newCol, draggedPiece);
-        moveHistory.push_back(move);
+        // For now, SAN is the same as algebraic; can be improved later
+        addMoveToHistory(algebraic, algebraic);
 
         // Update engine position if enabled
         if (uciEngine->isEnabled()) {
@@ -310,6 +337,7 @@ void ChessAnalysisProgram::renderGame() {
   renderBoard();
   renderPieces();
   renderEngineAnalysis();
+  renderMoveHistory();
   EndDrawing();
 }
 
@@ -324,7 +352,12 @@ void ChessAnalysisProgram::run() {
 
 void ChessAnalysisProgram::updateEnginePosition() {
   if (uciEngine && uciEngine->isEnabled()) {
-    uciEngine->setPosition(startingFen, moveHistory);
+    // Convert Move vector to string vector for UCI engine
+    std::vector<std::string> moves;
+    for (const auto& move : moveHistory) {
+      moves.push_back(move.algebraic);
+    }
+    uciEngine->setPosition(startingFen, moves);
   }
 }
 
@@ -461,4 +494,70 @@ void ChessAnalysisProgram::renderEngineAnalysis() {
 
     yPos += lineHeight;
   }
+}
+
+void ChessAnalysisProgram::renderMoveHistory() {
+  // Draw move history on the right side of the screen
+  int screenWidth = GetScreenWidth();
+  int xPos = screenWidth - 375;
+  int yPos = 20;
+  int lineHeight = 22;
+  int maxMovesToDisplay = 20;
+  
+  // Draw title
+  DrawText("Move History:", xPos, yPos, 18, DARKBLUE);
+  yPos += 28;
+  
+  // Calculate starting index (show last maxMovesToDisplay moves)
+  int startIdx = static_cast<int>(moveHistory.size()) > maxMovesToDisplay 
+                 ? moveHistory.size() - maxMovesToDisplay 
+                 : 0;
+  
+  // Draw move pairs (white and black moves side-by-side)
+  for (size_t i = startIdx; i < moveHistory.size(); i += 2) {
+    int moveNumber = (i / 2) + 1;
+    
+    // Draw move number
+    DrawText(TextFormat("%2d.", moveNumber), xPos, yPos, 16, DARKGRAY);
+    int textXPos = xPos + 35;
+    
+    // Draw white's move
+    if (i < moveHistory.size()) {
+      DrawText(moveHistory[i].algebraic.c_str(), textXPos, yPos, 16, BLACK);
+      textXPos += 70;
+    }
+    
+    // Draw black's move on the same line if it exists
+    if (i + 1 < moveHistory.size()) {
+      DrawText(moveHistory[i + 1].algebraic.c_str(), textXPos, yPos, 16, BLACK);
+    }
+    
+    yPos += lineHeight;
+  }
+  
+  // Draw move counter at bottom
+  DrawText(TextFormat("Total moves: %d", (int)moveHistory.size()), xPos, yPos + 10, 14, DARKGRAY);
+  
+  // Draw keyboard hints
+  int hintYPos = GetScreenHeight() - 80;
+  DrawText("Controls:", xPos, hintYPos, 14, DARKGRAY);
+  DrawText("R - Reset  |  U/Left Arrow - Undo  |  X - Toggle Engine", xPos, hintYPos + 20, 12, GRAY);
+}
+
+void ChessAnalysisProgram::addMoveToHistory(const std::string &algebraic, const std::string &san) {
+  // Determine move number and whose turn it was
+  int moveCount = moveHistory.size();
+  int moveNumber = (moveCount / 2) + 1;
+  bool wasWhiteMove = (moveCount % 2 == 0);  // White moves on even indices
+  
+  Move newMove;
+  newMove.algebraic = algebraic;
+  newMove.sanNotation = san;
+  newMove.moveNumber = moveNumber;
+  newMove.isWhiteMove = wasWhiteMove;
+  
+  moveHistory.push_back(newMove);
+  
+  TraceLog(LOG_INFO, "Move added to history: %s (Move %d, %s)",
+           algebraic.c_str(), moveNumber, wasWhiteMove ? "White" : "Black");
 }
