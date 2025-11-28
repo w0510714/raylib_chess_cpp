@@ -13,6 +13,10 @@ public:
   GameStatus getGameStatus() const { return status; }
   bool isWhiteTurn() const { return whiteTurn; }
   bool isGameOver() const { return gameOver; }
+    bool setWhiteTurn(bool isWhite) {
+    whiteTurn = isWhite;
+    return whiteTurn;
+  }
   void initializeBoard();
 
 private:

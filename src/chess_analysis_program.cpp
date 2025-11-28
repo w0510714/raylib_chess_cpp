@@ -234,6 +234,21 @@ void ChessAnalysisProgram::updateGame() {
     }
   }
 
+  if (IsKeyPressed(KEY_R)) {
+    // Reset game
+    currentPosition.initializeBoard();
+    moveHistory.clear();
+    // Set to white to move
+    currentPosition.setWhiteTurn(true);
+    // GameStatus Reset
+    GameStatus status = GameStatus::ONGOING;
+    TraceLog(LOG_INFO, "Game reset to starting position");
+    // Update engine position if enabled
+    if (uciEngine->isEnabled()) {
+      updateEnginePosition();
+    }
+  }
+
   // Poll engine analysis if enabled
   if (uciEngine->isEnabled()) {
     currentAnalysis = uciEngine->pollAnalysis();
