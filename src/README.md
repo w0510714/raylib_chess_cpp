@@ -1,11 +1,11 @@
-# A Simple Chess Game
-#
-# The part 3 of a 3 part assignment
-#
-# Run w/ Raylib (I use F5)
-#
-# Extra Assets in assets and images
-#
+## A Simple Chess Game
+
+- The part 3 of a 3 part assignment
+- Run w/ Raylib (I use F5)
+- Extra Assets in assets and images
+
+### IMPORTANT ###
+Make sure to have stockfish.exe in a folder called stockfish - must do fpr UCI engine
 
 ## UCI Engine Integration
 
@@ -52,18 +52,3 @@ This represents an endgame position with White to move.
 ```
 rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 ```
-
-#
-# More fixes I could do:
-#   Add more helped functions
-#   Reduce copied code
-#   Make cleaner & better formatting
-#   More comments for clarity
-# 
-# Things I wanted to add but didn't get around to:
-#   Visually saying what game state it is (checkmate)
-#   Highlighted (orange/red) for check and pinned pieces
-#   Changing the chess pieces and board
-#   Threefold repetition (was removed from requirements)
-#
-# I just wanted the neccesities done first

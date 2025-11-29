@@ -742,7 +742,7 @@ void ChessAnalysisProgram::renderControls() {
   int screenWidth = GetScreenWidth();
   int screenHeight = GetScreenHeight();
   int boxWidth = 350;
-  int boxHeight = isThreefoldRepetition() ? 110 : 80;
+  int boxHeight = 80;
   int xPos = screenWidth - boxWidth - 20;
   int yPos = screenHeight - boxHeight - 20;
   int padding = 10;
@@ -816,37 +816,35 @@ void ChessAnalysisProgram::renderGameStatus() {
   } else if (gameStatus == GameStatus::STALEMATE || gameStatus == GameStatus::DRAW) {
     statusStr = "Draw";
     statusColor = {150, 150, 150, 255};  // Gray
-  } else {
-    // If not explicitly checkmate, check as a fallback using ChessGame's
-    // checkmate detection in case the game status wasn't updated correctly.
-    bool whiteIsCheckmated = currentPosition.isCheckmatePublic(true);
-    bool blackIsCheckmated = currentPosition.isCheckmatePublic(false);
-    if (whiteIsCheckmated || blackIsCheckmated) {
+  } else if (gameStatus == GameStatus::CHECK) {
+    // If CHECK status, verify it's not actually checkmate
+    // (checkmate is when the player whose turn it is is in check AND has no legal moves)
+    bool currentPlayerIsCheckmated = currentPosition.isCheckmatePublic(currentPosition.isWhiteTurn());
+    if (currentPlayerIsCheckmated) {
       statusStr = "Checkmate";
       statusColor = {255, 100, 100, 255};
-      // ensure we prefer the explicit GameStatus if it eventually gets set
       gameStatus = GameStatus::CHECKMATE;
-    } else if (gameStatus == GameStatus::CHECK) {
+    } else {
       statusStr = "Check!";
       statusColor = {255, 200, 50, 255};  // Orange
-    } else if (isThreefoldRepetition()) {
-      // Fallback display if repetition detected but game status not yet updated
-      statusStr = "Draw: 3-fold Rep.";
-      statusColor = {150, 150, 150, 255};  // Gray
     }
+  } else if (isThreefoldRepetition()) {
+    // Fallback display if repetition detected but game status not yet updated
+    statusStr = "Draw: 3-fold Rep.";
+    statusColor = {150, 150, 150, 255};  // Gray
   }
   
   DrawText(statusStr.c_str(), xPos + padding, yPos + 35, 16, statusColor);
   
-  // Draw current player only when the game is ongoing or in check
-  if (gameStatus == GameStatus::ONGOING || gameStatus == GameStatus::CHECK) {
-    std::string playerStr = currentPosition.isWhiteTurn() ? "White to move" : "Black to move";
-    Color playerColor = currentPosition.isWhiteTurn() ? (Color){255, 255, 255, 255} : (Color){100, 100, 100, 255};
-    DrawText(playerStr.c_str(), xPos + padding, yPos + 60, 13, playerColor);
-  } else if (gameStatus == GameStatus::CHECKMATE) {
+  // Draw current player only when the game is ongoing or in check (but not checkmate)
+  if (statusStr == "Checkmate") {
     // Show the winner on checkmate
     std::string winnerStr = currentPosition.isWhiteTurn() ? "Black Wins" : "White Wins";
     DrawText(winnerStr.c_str(), xPos + padding, yPos + 60, 13, {255, 120, 120, 255});
+  } else if (gameStatus == GameStatus::ONGOING || gameStatus == GameStatus::CHECK) {
+    std::string playerStr = currentPosition.isWhiteTurn() ? "White to move" : "Black to move";
+    Color playerColor = currentPosition.isWhiteTurn() ? (Color){255, 255, 255, 255} : (Color){100, 100, 100, 255};
+    DrawText(playerStr.c_str(), xPos + padding, yPos + 60, 13, playerColor);
   }
   
   // Captured Pieces
