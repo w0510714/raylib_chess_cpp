@@ -46,6 +46,7 @@ private:
   int dragRow = -1, dragCol = -1;
   Vector2 dragOffset = {0, 0};
   PieceType draggedPiece = PieceType::EMPTY;
+  bool flipBoard = false; // Visual flip: when true, draw board upside-down
 
   // UCI Engine integration
   std::unique_ptr<UCIEngine> uciEngine;

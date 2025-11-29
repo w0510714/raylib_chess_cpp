@@ -181,18 +181,23 @@ void ChessAnalysisProgram::renderBoard() {
   // Draw top label strip (files: a-h)
   DrawRectangle(startX + labelSize, startY, (int)boardWidth, labelSize, LIGHTGRAY);
   for (int i = 0; i < 8; i++) {
+    // File labels: when flipped, show h->a left-to-right
+    char fileChar = flipBoard ? ('h' - i) : ('a' + i);
     float labelX = startX + labelSize + (boardWidth / 8.0f) * i + (boardWidth / 16.0f) - 5;
-    DrawText(TextFormat("%c", 'a' + i), (int)labelX, (int)(startY + 12), 16, BLACK);
+    DrawText(TextFormat("%c", fileChar), (int)labelX, (int)(startY + 12), 16, BLACK);
   }
   
   // Draw left label strip (ranks: 8-1)
   DrawRectangle(startX, startY + labelSize, labelSize, (int)boardHeight, LIGHTGRAY);
   for (int i = 0; i < 8; i++) {
+    // Rank labels: when flipped, show 1..8 top-to-bottom
+    int rank = flipBoard ? (i + 1) : (8 - i);
     float labelY = startY + labelSize + (boardHeight / 8.0f) * i + (boardHeight / 16.0f) - 8;
-    DrawText(TextFormat("%d", 8 - i), (int)(startX + 12), (int)labelY, 16, BLACK);
+    DrawText(TextFormat("%d", rank), (int)(startX + 12), (int)labelY, 16, BLACK);
   }
   
   // Draw the board itself
+  // Draw the board texture (no change). Pieces/coordinates will be mapped visually.
   DrawTextureEx(this->boardTexture, {startX + labelSize, startY + labelSize}, 0.0f, boardScale, WHITE);
 }
 
@@ -230,9 +235,13 @@ void ChessAnalysisProgram::renderPieces() {
       if (dragging && row == dragRow && col == dragCol)
         continue;
 
+      // Map logical board coordinates to visual coordinates when flipped
+      int visRow = flipBoard ? (7 - row) : row;
+      int visCol = flipBoard ? (7 - col) : col;
+
       Texture2D tex = getTextureForPiece(piece);
-      Vector2 pos = {boardStartX + col * squareSize + pieceOffset,
-                     boardStartY + row * squareSize + pieceOffset};
+      Vector2 pos = {boardStartX + visCol * squareSize + pieceOffset,
+                     boardStartY + visRow * squareSize + pieceOffset};
       DrawTextureEx(tex, pos, 0.0f, pieceScale, WHITE);
     }
   }
@@ -320,6 +329,12 @@ void ChessAnalysisProgram::updateGame() {
     }
   }
 
+  // Flip board visuals
+  if (IsKeyPressed(KEY_F)) {
+    flipBoard = !flipBoard;
+    TraceLog(LOG_INFO, "Board flip toggled: %s", flipBoard ? "ON" : "OFF");
+  }
+
   if (IsKeyPressed(KEY_R)) {
     // Reset game to standard chess starting position
     currentBaseFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -402,9 +417,11 @@ void ChessAnalysisProgram::updateGame() {
   }
 
   if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-    if (row >= 0 && row < 8 && col >= 0 &&
-        col < 8) { // Make sure we're clicking within the board
-      PieceType piece = currentPosition.getPieceAt(row, col);
+    if (row >= 0 && row < 8 && col >= 0 && col < 8) { // Make sure we're clicking within the board
+      // Map visual coords to logical when flipped (so clicks correspond to visual board)
+      int logicalCol = flipBoard ? (7 - col) : col;
+      int logicalRow = flipBoard ? (7 - row) : row;
+      PieceType piece = currentPosition.getPieceAt(logicalRow, logicalCol);
       if (piece != PieceType::EMPTY) {
         bool isWhitePiece =
             (piece == PieceType::WHITE_PAWN ||
@@ -413,11 +430,11 @@ void ChessAnalysisProgram::updateGame() {
              piece == PieceType::WHITE_ROOK ||
              piece == PieceType::WHITE_QUEEN || piece == PieceType::WHITE_KING);
         // Only allow dragging pieces that belong to the current player
-        if ((currentPosition.isWhiteTurn() && isWhitePiece) ||
-            (!currentPosition.isWhiteTurn() && !isWhitePiece)) {
+        if ((currentPosition.isWhiteTurn() && isWhitePiece) || (!currentPosition.isWhiteTurn() && !isWhitePiece)) {
           dragging = true;
-          dragRow = row;
-          dragCol = col;
+          // Store logical coords for the drag
+          dragRow = logicalRow;
+          dragCol = logicalCol;
           draggedPiece = piece;
           dragOffset = {-squareSize / 2, -squareSize / 2};
         }
@@ -431,14 +448,16 @@ void ChessAnalysisProgram::updateGame() {
     int newCol = static_cast<int>(newRelMouseX / squareSize);
     int newRow = static_cast<int>(newRelMouseY / squareSize);
 
+    // Map visual release coords to logical when flipped
+    int logicalNewCol = flipBoard ? (7 - newCol) : newCol;
+    int logicalNewRow = flipBoard ? (7 - newRow) : newRow;
+
     // Only make the move if both the start and end positions are within the
     // board
-    if (dragRow >= 0 && dragRow < 8 && dragCol >= 0 && dragCol < 8 &&
-        newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-      if (currentPosition.makeMove(dragRow, dragCol, newRow, newCol)) {
+    if (dragRow >= 0 && dragRow < 8 && dragCol >= 0 && dragCol < 8 && logicalNewRow >= 0 && logicalNewRow < 8 && logicalNewCol >= 0 && logicalNewCol < 8) {
+      if (currentPosition.makeMove(dragRow, dragCol, logicalNewRow, logicalNewCol)) {
         // Move was successful - add to move history
-        std::string algebraic =
-            moveToAlgebraic(dragRow, dragCol, newRow, newCol, draggedPiece);
+        std::string algebraic = moveToAlgebraic(dragRow, dragCol, logicalNewRow, logicalNewCol, draggedPiece);
         // For now, SAN is the same as algebraic; can be improved later
         addMoveToHistory(algebraic, algebraic);
 
@@ -722,6 +741,7 @@ void ChessAnalysisProgram::renderControls() {
   DrawText("L - Reset (FEN)", xPos + padding, yPos + 40, 10, {230, 230, 230, 255});
   DrawText("U / Left - Undo", xPos + padding, yPos + 52, 10, {230, 230, 230, 255});
   DrawText("X - Engine", xPos + padding, yPos + 64, 10, {230, 230, 230, 255});
+  DrawText("F - Flip Board", xPos + 200, yPos + 28, 10, {230, 230, 230, 255});
 }
 
 void ChessAnalysisProgram::addMoveToHistory(const std::string &algebraic, const std::string &san) {
