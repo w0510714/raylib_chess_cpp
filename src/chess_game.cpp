@@ -35,6 +35,15 @@ void ChessGame::initializeBoard() {
     }
   }
 
+  // Clear captured pieces
+  whiteCapturedPieces.clear();
+  blackCapturedPieces.clear();
+  
+  // Reset game state
+  whiteTurn = true;
+  status = GameStatus::ONGOING;
+  gameOver = false;
+
   // Black back rank (row 0) and pawns (row 1)
   board[0][0] = PieceType::BLACK_ROOK;
   board[0][1] = PieceType::BLACK_KNIGHT;
@@ -282,11 +291,16 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
   // Switch turn
   whiteTurn = !whiteTurn;
 
+  // Update game status
+  status = GameStatus::ONGOING;
+  
   if (isInsufficientMaterial()) {
     std::cout << "Draw by insufficient material!\n";
+    status = GameStatus::DRAW;
     gameOver = true;
   } else if (isFiftyMoveRuleReached()) {
     std::cout << "Draw by fifty-move rule!\n";
+    status = GameStatus::DRAW;
     gameOver = true;
   }
 
@@ -294,10 +308,31 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
   bool opponentIsWhite = whiteTurn; // we just flipped turns
   if (isCheckmate(opponentIsWhite)) {
     std::cout << (opponentIsWhite ? "White" : "Black") << " is checkmated!\n";
+    status = GameStatus::CHECKMATE;
     gameOver = true;
   } else if (isStalemate(opponentIsWhite)) {
     std::cout << "Stalemate! The game is a draw.\n";
+    status = GameStatus::STALEMATE;
     gameOver = true;
+  } else if (isKingInCheck(opponentIsWhite)) {
+    status = GameStatus::CHECK;
+  }
+
+  // Track captures ONLY after move is validated
+  if (willBeEnPassantCapture) {
+    if (isWhitePiece) {
+      blackCapturedPieces.push_back(origCapturedPawn);
+    } else {
+      whiteCapturedPieces.push_back(origCapturedPawn);
+    }
+  }
+
+  if (target != PieceType::EMPTY) {
+    if (isWhitePiece) {
+      blackCapturedPieces.push_back(target);
+    } else {
+      whiteCapturedPieces.push_back(target);
+    }
   }
 
   return true;
@@ -904,6 +939,14 @@ bool ChessGame::loadFromFEN(const char *fen) {
       board[row][col] = PieceType::EMPTY;
     }
   }
+
+  // Clear captured pieces
+  whiteCapturedPieces.clear();
+  blackCapturedPieces.clear();
+  
+  // Reset game state
+  status = GameStatus::ONGOING;
+  gameOver = false;
 
   // Parse FEN string
   std::istringstream iss(fen);

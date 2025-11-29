@@ -494,6 +494,7 @@ void ChessAnalysisProgram::renderGame() {
   ClearBackground({40, 44, 52, 255});  // Dark gray background
   renderBoard();
   renderPieces();
+  renderGameStatus();
   renderEngineAnalysis();
   renderMoveHistory();
   renderControls();
@@ -776,6 +777,91 @@ void ChessAnalysisProgram::addMoveToHistory(const std::string &algebraic, const 
   
   TraceLog(LOG_INFO, "Move added to history: %s (Move %d, %s)",
            algebraic.c_str(), moveNumber, wasWhiteMove ? "White" : "Black");
+}
+
+void ChessAnalysisProgram::renderGameStatus() {
+  int screenWidth = GetScreenWidth();
+  int screenHeight = GetScreenHeight();
+  
+  // Box dimensions and position (larger box shifted right)
+  int boxWidth = 450;
+  int boxHeight = 650;
+  int boardRightX = 100 + 500;  // Board starts at 100, 500 pixels wide
+  int xPos = boardRightX + 350;  // Shifted more to the right
+  int yPos = (screenHeight - boxHeight) / 2;
+  int padding = 15;
+  int pieceSize = 28;
+  
+  // Draw box background
+  DrawRectangle(xPos, yPos, boxWidth, boxHeight, {60, 50, 45, 255});  // Dark brown
+  DrawRectangleLines(xPos, yPos, boxWidth, boxHeight, {200, 150, 100, 255});  // Brown border
+  
+  // TOP HALF: Game Status
+  DrawText("Game Status", xPos + padding, yPos + padding, 12, {220, 190, 160, 255});
+  
+  // Determine game status string
+  std::string statusStr = "Ongoing";
+  Color statusColor = {100, 200, 100, 255};  // Green
+  
+  GameStatus gameStatus = currentPosition.getGameStatus();
+  
+  if (isThreefoldRepetition()) {
+    statusStr = "Draw: 3-fold Rep.";
+    statusColor = {150, 150, 150, 255};  // Gray
+  } else if (gameStatus == GameStatus::CHECKMATE) {
+    // The player whose turn it is was the one checkmated
+    // So the OTHER player wins
+    statusStr = currentPosition.isWhiteTurn() ? "Black Wins" : "White Wins";
+    statusColor = {255, 100, 100, 255};  // Red
+  } else if (gameStatus == GameStatus::STALEMATE || gameStatus == GameStatus::DRAW) {
+    statusStr = "Draw";
+    statusColor = {150, 150, 150, 255};  // Gray
+  } else if (gameStatus == GameStatus::CHECK) {
+    statusStr = "Check!";
+    statusColor = {255, 200, 50, 255};  // Orange
+  }
+  
+  DrawText(statusStr.c_str(), xPos + padding, yPos + 35, 16, statusColor);
+  
+  // Draw current player
+  std::string playerStr = currentPosition.isWhiteTurn() ? "White to move" : "Black to move";
+  Color playerColor = currentPosition.isWhiteTurn() ? (Color){255, 255, 255, 255} : (Color){100, 100, 100, 255};
+  DrawText(playerStr.c_str(), xPos + padding, yPos + 60, 13, playerColor);
+  
+  // BOTTOM HALF: Captured Pieces
+  int captureYStart = yPos + 140;
+  DrawText("Captured Pieces", xPos + padding, captureYStart, 13, {220, 190, 160, 255});
+  
+  // White captured pieces (captured by black)
+  DrawText("By Black:", xPos + padding, captureYStart + 25, 11, {200, 200, 200, 255});
+  int whiteCaptX = xPos + padding;
+  int whiteCaptY = captureYStart + 45;
+  
+  for (size_t i = 0; i < currentPosition.getWhiteCapturedPieces().size(); i++) {
+    PieceType piece = currentPosition.getWhiteCapturedPieces()[i];
+    Texture2D tex = getTextureForPiece(piece);
+    DrawTextureEx(tex, {(float)(whiteCaptX + (i % 12) * 32), (float)whiteCaptY}, 0, 
+                  (float)pieceSize / tex.width, WHITE);
+    if ((i + 1) % 12 == 0) {
+      whiteCaptY += 35;
+    }
+  }
+  
+  // Black captured pieces (captured by white)
+  int blackCaptY = whiteCaptY + (currentPosition.getWhiteCapturedPieces().size() > 0 ? 40 : 20);
+  DrawText("By White:", xPos + padding, blackCaptY, 11, {200, 200, 200, 255});
+  int blackCaptX = xPos + padding;
+  int blackCaptStartY = blackCaptY + 15;
+  
+  for (size_t i = 0; i < currentPosition.getBlackCapturedPieces().size(); i++) {
+    PieceType piece = currentPosition.getBlackCapturedPieces()[i];
+    Texture2D tex = getTextureForPiece(piece);
+    DrawTextureEx(tex, {(float)(blackCaptX + (i % 12) * 32), (float)blackCaptStartY}, 0, 
+                  (float)pieceSize / tex.width, WHITE);
+    if ((i + 1) % 12 == 0) {
+      blackCaptStartY += 35;
+    }
+  }
 }
 
 bool ChessAnalysisProgram::isThreefoldRepetition() const {

@@ -1,6 +1,7 @@
 #include "chess_game_enums.h"
 #include <cmath>
 #include <memory>
+#include <vector>
 
 
 class ChessGame {
@@ -13,13 +14,20 @@ public:
   GameStatus getGameStatus() const { return status; }
   bool isWhiteTurn() const { return whiteTurn; }
   bool isGameOver() const { return gameOver; }
-    bool setWhiteTurn(bool isWhite) {
+  bool setWhiteTurn(bool isWhite) {
     whiteTurn = isWhite;
     return whiteTurn;
   }
   void initializeBoard();
   bool loadFromFEN(const char* fen);
   std::string generateFEN() const;  // Generate FEN string from current position
+  
+  // Captured pieces tracking
+  std::vector<PieceType> getWhiteCapturedPieces() const { return whiteCapturedPieces; }
+  std::vector<PieceType> getBlackCapturedPieces() const { return blackCapturedPieces; }
+  
+  // Check detection
+  bool isKingInCheck(bool whiteKing) const;
 
 private:
   PieceType board[8][8];
@@ -27,7 +35,6 @@ private:
   GameStatus status;
   bool gameOver = false;
 
-  bool isKingInCheck(bool whiteKing) const;
   bool isCheckmate(bool whiteKing);
   bool isStalemate(bool whiteKing) const;
   bool isInsufficientMaterial() const;
@@ -61,5 +68,9 @@ private:
   bool whiteRookQueensideMoved = false;
   bool blackRookKingsideMoved = false;
   bool blackRookQueensideMoved = false;
+  
+  // Captured pieces tracking
+  std::vector<PieceType> whiteCapturedPieces;  // Pieces captured by black
+  std::vector<PieceType> blackCapturedPieces;  // Pieces captured by white
 
 };

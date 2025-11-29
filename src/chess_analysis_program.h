@@ -66,6 +66,7 @@ private:
   void renderEngineAnalysis();
   void renderMoveHistory();
   void renderControls();
+  void renderGameStatus();  // New: render game status and captured pieces
   void getTextureForPiece();
   void loadAllTextures();
   void unloadAllTextures();
