@@ -41,6 +41,9 @@ ChessAnalysisProgram::ChessAnalysisProgram() {
   // Initialize currentBaseFen to the starting FEN (L key state)
   currentBaseFen = startingFen;
   moveHistory.clear();
+  // Initialize position history with the starting position
+  positionHistory.clear();
+  positionHistory[generatePositionKey()] = 1;
 }
 
 ChessAnalysisProgram::~ChessAnalysisProgram() {
@@ -50,7 +53,6 @@ ChessAnalysisProgram::~ChessAnalysisProgram() {
 
 void ChessAnalysisProgram::loadAllTextures() {
   // Load assets
-  // CHANGED: Use woodenboard.png instead of board.png
   this->boardTexture = LoadTexture("src/assets/board.png");
   if (!this->boardTexture.id) {
     TraceLog(LOG_ERROR, "Failed to load board texture!");
@@ -153,10 +155,6 @@ void ChessAnalysisProgram::unloadAllTextures() {
     UnloadTexture(blackQueenTexture);
   if (blackPawnTexture.id)
     UnloadTexture(blackPawnTexture);
-}
-
-void ChessAnalysisProgram::renderUI() {
-  // Render user interface elements here
 }
 
 void ChessAnalysisProgram::renderBoard() {
@@ -344,7 +342,7 @@ void ChessAnalysisProgram::updateGame() {
     currentPosition.setWhiteTurn(true);
     moveHistory.clear();
     positionHistory.clear();
-    positionHistory[currentPosition.generateFEN()] = 1;  // Initial position
+    positionHistory[generatePositionKey()] = 1;  // Initial position
     lastEnginePositionFen = "";  // Force engine update on next frame
     TraceLog(LOG_INFO, "Game reset to standard chess starting position");
     // Update engine position if enabled
@@ -359,7 +357,7 @@ void ChessAnalysisProgram::updateGame() {
     currentPosition.loadFromFEN(startingFen.c_str());
     moveHistory.clear();
     positionHistory.clear();
-    positionHistory[currentPosition.generateFEN()] = 1;  // Initial position
+    positionHistory[generatePositionKey()] = 1;  // Initial position
     lastEnginePositionFen = "";  // Force engine update on next frame
     TraceLog(LOG_INFO, "Game reset to FEN starting position");
     // Update engine position if enabled
@@ -382,7 +380,7 @@ void ChessAnalysisProgram::updateGame() {
       
       // Rebuild position history
       positionHistory.clear();
-      positionHistory[currentPosition.generateFEN()] = 1;
+      positionHistory[generatePositionKey()] = 1;
       
       // Replay all moves except the last one
       for (const auto& move : moveHistory) {
@@ -393,7 +391,13 @@ void ChessAnalysisProgram::updateGame() {
         int endRow = 8 - (move.algebraic[3] - '0');
         currentPosition.makeMove(startRow, startCol, endRow, endCol);
         // Track position for threefold repetition detection
-        positionHistory[currentPosition.generateFEN()]++;
+        {
+          std::string key = generatePositionKey();
+          positionHistory[key]++;
+          if (positionHistory[key] >= 3) {
+            currentPosition.declareDraw("Threefold repetition");
+          }
+        }
       }
       
       lastEnginePositionFen = "";  // Force engine update on next frame
@@ -470,12 +474,16 @@ void ChessAnalysisProgram::updateGame() {
       if (currentPosition.makeMove(dragRow, dragCol, logicalNewRow, logicalNewCol)) {
         // Move was successful - add to move history
         std::string algebraic = moveToAlgebraic(dragRow, dragCol, logicalNewRow, logicalNewCol, draggedPiece);
-        // For now, SAN is the same as algebraic; can be improved later
         addMoveToHistory(algebraic, algebraic);
 
         // Track position for threefold repetition detection
-        std::string fen = currentPosition.generateFEN();
-        positionHistory[fen]++;
+        {
+          std::string key = generatePositionKey();
+          positionHistory[key]++;
+          if (positionHistory[key] >= 3) {
+            currentPosition.declareDraw("Threefold repetition");
+          }
+        }
 
         // Update engine position if enabled
         if (uciEngine->isEnabled()) {
@@ -748,12 +756,8 @@ void ChessAnalysisProgram::renderControls() {
   DrawText("Controls", xPos + padding, yPos + padding, 14, {255, 180, 100, 255});
   
   // Draw threefold repetition draw status if detected
-  if (isThreefoldRepetition()) {
-    DrawText("DRAW: Threefold Repetition", xPos + padding, yPos + 24, 12, {255, 100, 100, 255});
-  }
-  
   // Draw control descriptions
-  int controlStartY = isThreefoldRepetition() ? yPos + 42 : yPos + 28;
+  int controlStartY = yPos + 28;
   DrawText("R - Reset (Standard)", xPos + padding, controlStartY, 10, {230, 230, 230, 255});
   DrawText("L - Reset (FEN)", xPos + padding, controlStartY + 12, 10, {230, 230, 230, 255});
   DrawText("U / Left - Undo", xPos + padding, controlStartY + 24, 10, {230, 230, 230, 255});
@@ -796,7 +800,7 @@ void ChessAnalysisProgram::renderGameStatus() {
   DrawRectangle(xPos, yPos, boxWidth, boxHeight, {60, 50, 45, 255});  // Dark brown
   DrawRectangleLines(xPos, yPos, boxWidth, boxHeight, {200, 150, 100, 255});  // Brown border
   
-  // TOP HALF: Game Status
+  // Game Status
   DrawText("Game Status", xPos + padding, yPos + padding, 12, {220, 190, 160, 255});
   
   // Determine game status string
@@ -805,30 +809,47 @@ void ChessAnalysisProgram::renderGameStatus() {
   
   GameStatus gameStatus = currentPosition.getGameStatus();
   
-  if (isThreefoldRepetition()) {
-    statusStr = "Draw: 3-fold Rep.";
-    statusColor = {150, 150, 150, 255};  // Gray
-  } else if (gameStatus == GameStatus::CHECKMATE) {
-    // The player whose turn it is was the one checkmated
-    // So the OTHER player wins
-    statusStr = currentPosition.isWhiteTurn() ? "Black Wins" : "White Wins";
+  // Prefer explicit game status from ChessGame over direct repetition checks
+  if (gameStatus == GameStatus::CHECKMATE) {
+    statusStr = "Checkmate";
     statusColor = {255, 100, 100, 255};  // Red
   } else if (gameStatus == GameStatus::STALEMATE || gameStatus == GameStatus::DRAW) {
     statusStr = "Draw";
     statusColor = {150, 150, 150, 255};  // Gray
-  } else if (gameStatus == GameStatus::CHECK) {
-    statusStr = "Check!";
-    statusColor = {255, 200, 50, 255};  // Orange
+  } else {
+    // If not explicitly checkmate, check as a fallback using ChessGame's
+    // checkmate detection in case the game status wasn't updated correctly.
+    bool whiteIsCheckmated = currentPosition.isCheckmatePublic(true);
+    bool blackIsCheckmated = currentPosition.isCheckmatePublic(false);
+    if (whiteIsCheckmated || blackIsCheckmated) {
+      statusStr = "Checkmate";
+      statusColor = {255, 100, 100, 255};
+      // ensure we prefer the explicit GameStatus if it eventually gets set
+      gameStatus = GameStatus::CHECKMATE;
+    } else if (gameStatus == GameStatus::CHECK) {
+      statusStr = "Check!";
+      statusColor = {255, 200, 50, 255};  // Orange
+    } else if (isThreefoldRepetition()) {
+      // Fallback display if repetition detected but game status not yet updated
+      statusStr = "Draw: 3-fold Rep.";
+      statusColor = {150, 150, 150, 255};  // Gray
+    }
   }
   
   DrawText(statusStr.c_str(), xPos + padding, yPos + 35, 16, statusColor);
   
-  // Draw current player
-  std::string playerStr = currentPosition.isWhiteTurn() ? "White to move" : "Black to move";
-  Color playerColor = currentPosition.isWhiteTurn() ? (Color){255, 255, 255, 255} : (Color){100, 100, 100, 255};
-  DrawText(playerStr.c_str(), xPos + padding, yPos + 60, 13, playerColor);
+  // Draw current player only when the game is ongoing or in check
+  if (gameStatus == GameStatus::ONGOING || gameStatus == GameStatus::CHECK) {
+    std::string playerStr = currentPosition.isWhiteTurn() ? "White to move" : "Black to move";
+    Color playerColor = currentPosition.isWhiteTurn() ? (Color){255, 255, 255, 255} : (Color){100, 100, 100, 255};
+    DrawText(playerStr.c_str(), xPos + padding, yPos + 60, 13, playerColor);
+  } else if (gameStatus == GameStatus::CHECKMATE) {
+    // Show the winner on checkmate
+    std::string winnerStr = currentPosition.isWhiteTurn() ? "Black Wins" : "White Wins";
+    DrawText(winnerStr.c_str(), xPos + padding, yPos + 60, 13, {255, 120, 120, 255});
+  }
   
-  // BOTTOM HALF: Captured Pieces
+  // Captured Pieces
   int captureYStart = yPos + 140;
   DrawText("Captured Pieces", xPos + padding, captureYStart, 13, {220, 190, 160, 255});
   
@@ -865,10 +886,26 @@ void ChessAnalysisProgram::renderGameStatus() {
 }
 
 bool ChessAnalysisProgram::isThreefoldRepetition() const {
-  std::string currentFen = currentPosition.generateFEN();
-  auto it = positionHistory.find(currentFen);
+  std::string key = generatePositionKey();
+  auto it = positionHistory.find(key);
   if (it != positionHistory.end()) {
     return it->second >= 3;
   }
   return false;
+}
+
+// Build a normalized position key for repetition detection.
+// Keep only the first 4 fields of FEN: board, side to move, castling, en-passant.
+std::string ChessAnalysisProgram::generatePositionKey() const {
+  std::string fen = currentPosition.generateFEN();
+  std::istringstream iss(fen);
+  std::string part;
+  std::string key;
+  int fields = 0;
+  while (iss >> part && fields < 4) {
+    if (fields > 0) key += ' ';
+    key += part;
+    fields++;
+  }
+  return key;
 }

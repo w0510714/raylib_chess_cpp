@@ -2,6 +2,7 @@
 #include <cmath>
 #include <memory>
 #include <vector>
+#include <string>
 
 
 class ChessGame {
@@ -26,8 +27,12 @@ public:
   std::vector<PieceType> getWhiteCapturedPieces() const { return whiteCapturedPieces; }
   std::vector<PieceType> getBlackCapturedPieces() const { return blackCapturedPieces; }
   
+  // Declare the game a draw (used by external controllers, e.g., threefold)
+  void declareDraw(const std::string& reason = std::string());
   // Check detection
   bool isKingInCheck(bool whiteKing) const;
+  // Public wrapper to check for checkmate for a given color (true=white)
+  bool isCheckmatePublic(bool whiteKing);
 
 private:
   PieceType board[8][8];

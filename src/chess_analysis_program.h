@@ -40,7 +40,7 @@ private:
   Texture2D blackPawnTexture;
 
   ChessGame currentPosition;
-  ChessGame game; // For later
+  ChessGame game;
 
   // Drag and drop state
   bool dragging = false;
@@ -58,6 +58,8 @@ private:
   std::string lastEnginePositionFen;  // Track position to detect changes
   std::map<std::string, int> positionHistory;  // Track FEN occurrences for threefold repetition
 
+  // Helper to generate a normalized position key for repetition detection
+  std::string generatePositionKey() const;
   void renderGame();
   void updateGame();
   void renderUI();
@@ -66,7 +68,7 @@ private:
   void renderEngineAnalysis();
   void renderMoveHistory();
   void renderControls();
-  void renderGameStatus();  // New: render game status and captured pieces
+  void renderGameStatus(); 
   void getTextureForPiece();
   void loadAllTextures();
   void unloadAllTextures();

@@ -338,6 +338,17 @@ bool ChessGame::makeMove(int startRow, int startCol, int endRow, int endCol) {
   return true;
 }
 
+void ChessGame::declareDraw(const std::string& reason) {
+  if (gameOver) return;
+  status = GameStatus::DRAW;
+  gameOver = true;
+  if (!reason.empty()) {
+    std::cout << "Draw declared: " << reason << "\n";
+  } else {
+    std::cout << "Draw declared\n";
+  }
+}
+
 bool ChessGame::isKingInCheck(bool whiteKing) const {
   int kingRow = -1, kingCol = -1;
 
@@ -436,8 +447,6 @@ bool ChessGame::isCheckmate(bool whiteKing) {
 
           bool valid = false;
 
-          // Same logic I used in makeMove - I could turn this into a helper
-          // function later
           if (piece == PieceType::WHITE_PAWN || piece == PieceType::BLACK_PAWN)
             valid = isValidPawnMove(piece, startRow, startCol, endRow, endCol,
                                     board, -1, -1);
@@ -706,6 +715,11 @@ bool ChessGame::isValidPawnMove(PieceType piece, int startRow, int startCol,
   }
 
   return false;
+}
+
+// Public wrapper to allow external callers to query checkmate state
+bool ChessGame::isCheckmatePublic(bool whiteKing) {
+  return isCheckmate(whiteKing);
 }
 
 bool ChessGame::isValidKingMove(PieceType piece, int startRow, int startCol,
