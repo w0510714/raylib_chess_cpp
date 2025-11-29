@@ -6,9 +6,11 @@
 
 ChessAnalysisProgram::ChessAnalysisProgram() {
   // Initialization
-  const int screenWidth = 1820;
-  const int screenHeight = 980;
+  const int screenWidth = 1920;
+  const int screenHeight = 1080;
 
+  // Set fullscreen flag before initializing window
+  SetConfigFlags(FLAG_FULLSCREEN_MODE);
   InitWindow(screenWidth, screenHeight, "Chess Analysis Program");
 
   SetTargetFPS(120); // Set the desired frame rate
@@ -341,6 +343,8 @@ void ChessAnalysisProgram::updateGame() {
     currentPosition.initializeBoard();
     currentPosition.setWhiteTurn(true);
     moveHistory.clear();
+    positionHistory.clear();
+    positionHistory[currentPosition.generateFEN()] = 1;  // Initial position
     lastEnginePositionFen = "";  // Force engine update on next frame
     TraceLog(LOG_INFO, "Game reset to standard chess starting position");
     // Update engine position if enabled
@@ -354,6 +358,8 @@ void ChessAnalysisProgram::updateGame() {
     currentBaseFen = startingFen;  // Use the loaded FEN as base
     currentPosition.loadFromFEN(startingFen.c_str());
     moveHistory.clear();
+    positionHistory.clear();
+    positionHistory[currentPosition.generateFEN()] = 1;  // Initial position
     lastEnginePositionFen = "";  // Force engine update on next frame
     TraceLog(LOG_INFO, "Game reset to FEN starting position");
     // Update engine position if enabled
@@ -374,6 +380,10 @@ void ChessAnalysisProgram::updateGame() {
         currentPosition.loadFromFEN(currentBaseFen.c_str());
       }
       
+      // Rebuild position history
+      positionHistory.clear();
+      positionHistory[currentPosition.generateFEN()] = 1;
+      
       // Replay all moves except the last one
       for (const auto& move : moveHistory) {
         // Parse and replay move from algebraic notation
@@ -382,6 +392,8 @@ void ChessAnalysisProgram::updateGame() {
         int endCol = move.algebraic[2] - 'a';
         int endRow = 8 - (move.algebraic[3] - '0');
         currentPosition.makeMove(startRow, startCol, endRow, endCol);
+        // Track position for threefold repetition detection
+        positionHistory[currentPosition.generateFEN()]++;
       }
       
       lastEnginePositionFen = "";  // Force engine update on next frame
@@ -453,13 +465,17 @@ void ChessAnalysisProgram::updateGame() {
     int logicalNewRow = flipBoard ? (7 - newRow) : newRow;
 
     // Only make the move if both the start and end positions are within the
-    // board
-    if (dragRow >= 0 && dragRow < 8 && dragCol >= 0 && dragCol < 8 && logicalNewRow >= 0 && logicalNewRow < 8 && logicalNewCol >= 0 && logicalNewCol < 8) {
+    // board and threefold repetition hasn't been detected
+    if (!isThreefoldRepetition() && dragRow >= 0 && dragRow < 8 && dragCol >= 0 && dragCol < 8 && logicalNewRow >= 0 && logicalNewRow < 8 && logicalNewCol >= 0 && logicalNewCol < 8) {
       if (currentPosition.makeMove(dragRow, dragCol, logicalNewRow, logicalNewCol)) {
         // Move was successful - add to move history
         std::string algebraic = moveToAlgebraic(dragRow, dragCol, logicalNewRow, logicalNewCol, draggedPiece);
         // For now, SAN is the same as algebraic; can be improved later
         addMoveToHistory(algebraic, algebraic);
+
+        // Track position for threefold repetition detection
+        std::string fen = currentPosition.generateFEN();
+        positionHistory[fen]++;
 
         // Update engine position if enabled
         if (uciEngine->isEnabled()) {
@@ -676,7 +692,7 @@ void ChessAnalysisProgram::renderMoveHistory() {
   int yPos = 420;
   int padding = 10;
   int lineHeight = 20;
-  int maxMovesToDisplay = 12;
+  int maxMovesToDisplay = 20;
   
   // Draw box background
   DrawRectangle(xPos, yPos, boxWidth, boxHeight, {50, 65, 55, 255});  // Dark sage green
@@ -692,25 +708,19 @@ void ChessAnalysisProgram::renderMoveHistory() {
                  ? moveHistory.size() - maxMovesToDisplay 
                  : 0;
   
-  // Draw move pairs (white and black moves side-by-side)
+  // Draw moves one per line with move numbers
   int displayYPos = contentYPos;
-  for (size_t i = startIdx; i < moveHistory.size(); i += 2) {
+  for (size_t i = startIdx; i < moveHistory.size(); i++) {
     int moveNumber = (i / 2) + 1;
+    bool isWhiteMove = (i % 2 == 0);
     
-    // Draw move number
-    DrawText(TextFormat("%d.", moveNumber), xPos + padding, displayYPos, 12, {180, 180, 180, 255});
-    int textXPos = xPos + 40;
+    // Draw move number and move notation
+    std::string moveLabel = TextFormat("%d. %s", moveNumber, moveHistory[i].algebraic.c_str());
     
-    // Draw white's move
-    if (i < moveHistory.size()) {
-      DrawText(moveHistory[i].algebraic.c_str(), textXPos, displayYPos, 12, {220, 220, 220, 255});
-      textXPos += 70;
-    }
+    // Color: white moves in light gray, black moves in darker gray
+    Color moveColor = isWhiteMove ? (Color){255, 255, 255, 255} : (Color){0, 0, 0, 255};
     
-    // Draw black's move on the same line if it exists
-    if (i + 1 < moveHistory.size()) {
-      DrawText(moveHistory[i + 1].algebraic.c_str(), textXPos, displayYPos, 12, {220, 220, 220, 255});
-    }
+    DrawText(moveLabel.c_str(), xPos + padding, displayYPos, 12, moveColor);
     
     displayYPos += lineHeight;
   }
@@ -723,7 +733,7 @@ void ChessAnalysisProgram::renderControls() {
   int screenWidth = GetScreenWidth();
   int screenHeight = GetScreenHeight();
   int boxWidth = 350;
-  int boxHeight = 80;
+  int boxHeight = isThreefoldRepetition() ? 110 : 80;
   int xPos = screenWidth - boxWidth - 20;
   int yPos = screenHeight - boxHeight - 20;
   int padding = 10;
@@ -736,12 +746,18 @@ void ChessAnalysisProgram::renderControls() {
   // Draw title
   DrawText("Controls", xPos + padding, yPos + padding, 14, {255, 180, 100, 255});
   
+  // Draw threefold repetition draw status if detected
+  if (isThreefoldRepetition()) {
+    DrawText("DRAW: Threefold Repetition", xPos + padding, yPos + 24, 12, {255, 100, 100, 255});
+  }
+  
   // Draw control descriptions
-  DrawText("R - Reset (Standard)", xPos + padding, yPos + 28, 10, {230, 230, 230, 255});
-  DrawText("L - Reset (FEN)", xPos + padding, yPos + 40, 10, {230, 230, 230, 255});
-  DrawText("U / Left - Undo", xPos + padding, yPos + 52, 10, {230, 230, 230, 255});
-  DrawText("X - Engine", xPos + padding, yPos + 64, 10, {230, 230, 230, 255});
-  DrawText("F - Flip Board", xPos + 200, yPos + 28, 10, {230, 230, 230, 255});
+  int controlStartY = isThreefoldRepetition() ? yPos + 42 : yPos + 28;
+  DrawText("R - Reset (Standard)", xPos + padding, controlStartY, 10, {230, 230, 230, 255});
+  DrawText("L - Reset (FEN)", xPos + padding, controlStartY + 12, 10, {230, 230, 230, 255});
+  DrawText("U / Left - Undo", xPos + padding, controlStartY + 24, 10, {230, 230, 230, 255});
+  DrawText("X - Engine", xPos + padding, controlStartY + 36, 10, {230, 230, 230, 255});
+  DrawText("F - Flip Board", xPos + 200, controlStartY, 10, {230, 230, 230, 255});
 }
 
 void ChessAnalysisProgram::addMoveToHistory(const std::string &algebraic, const std::string &san) {
@@ -760,4 +776,13 @@ void ChessAnalysisProgram::addMoveToHistory(const std::string &algebraic, const 
   
   TraceLog(LOG_INFO, "Move added to history: %s (Move %d, %s)",
            algebraic.c_str(), moveNumber, wasWhiteMove ? "White" : "Black");
+}
+
+bool ChessAnalysisProgram::isThreefoldRepetition() const {
+  std::string currentFen = currentPosition.generateFEN();
+  auto it = positionHistory.find(currentFen);
+  if (it != positionHistory.end()) {
+    return it->second >= 3;
+  }
+  return false;
 }

@@ -19,6 +19,7 @@ public:
   }
   void initializeBoard();
   bool loadFromFEN(const char* fen);
+  std::string generateFEN() const;  // Generate FEN string from current position
 
 private:
   PieceType board[8][8];

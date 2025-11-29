@@ -1058,3 +1058,101 @@ bool ChessGame::loadFromFEN(const char *fen) {
   std::cout << "Successfully loaded position from FEN\n";
   return true;
 }
+
+std::string ChessGame::generateFEN() const {
+  std::ostringstream fen;
+
+  // 1. Board position
+  for (int row = 0; row < 8; ++row) {
+    int emptyCount = 0;
+    for (int col = 0; col < 8; ++col) {
+      PieceType piece = board[row][col];
+      if (piece == PieceType::EMPTY) {
+        emptyCount++;
+      } else {
+        if (emptyCount > 0) {
+          fen << emptyCount;
+          emptyCount = 0;
+        }
+        // Convert piece to FEN character
+        switch (piece) {
+          case PieceType::WHITE_PAWN: fen << 'P'; break;
+          case PieceType::WHITE_KNIGHT: fen << 'N'; break;
+          case PieceType::WHITE_BISHOP: fen << 'B'; break;
+          case PieceType::WHITE_ROOK: fen << 'R'; break;
+          case PieceType::WHITE_QUEEN: fen << 'Q'; break;
+          case PieceType::WHITE_KING: fen << 'K'; break;
+          case PieceType::BLACK_PAWN: fen << 'p'; break;
+          case PieceType::BLACK_KNIGHT: fen << 'n'; break;
+          case PieceType::BLACK_BISHOP: fen << 'b'; break;
+          case PieceType::BLACK_ROOK: fen << 'r'; break;
+          case PieceType::BLACK_QUEEN: fen << 'q'; break;
+          case PieceType::BLACK_KING: fen << 'k'; break;
+          default: break;
+        }
+      }
+    }
+    if (emptyCount > 0) {
+      fen << emptyCount;
+    }
+    if (row < 7) {
+      fen << '/';
+    }
+  }
+
+  fen << ' ';
+
+  // 2. Side to move
+  fen << (whiteTurn ? 'w' : 'b');
+
+  fen << ' ';
+
+  // 3. Castling rights
+  bool hasCastlingRight = false;
+  if (!whiteKingMoved) {
+    if (!whiteRookKingsideMoved) {
+      fen << 'K';
+      hasCastlingRight = true;
+    }
+    if (!whiteRookQueensideMoved) {
+      fen << 'Q';
+      hasCastlingRight = true;
+    }
+  }
+  if (!blackKingMoved) {
+    if (!blackRookKingsideMoved) {
+      fen << 'k';
+      hasCastlingRight = true;
+    }
+    if (!blackRookQueensideMoved) {
+      fen << 'q';
+      hasCastlingRight = true;
+    }
+  }
+  if (!hasCastlingRight) {
+    fen << '-';
+  }
+
+  fen << ' ';
+
+  // 4. En passant target square
+  if (enPassantTargetRow != -1 && enPassantTargetCol != -1) {
+    fen << (char)('a' + enPassantTargetCol);
+    fen << (char)('8' - enPassantTargetRow);
+  } else {
+    fen << '-';
+  }
+
+  fen << ' ';
+
+  // 5. Halfmove clock
+  fen << halfMoveClock;
+
+  fen << ' ';
+
+  // 6. Fullmove number (we'll use a default of 1 for now)
+  fen << "1";
+
+  return fen.str();
+}
+

@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 
 // Structure to track individual moves
 struct Move {
@@ -55,6 +56,7 @@ private:
   std::vector<Move> moveHistory;
   EngineAnalysis currentAnalysis;
   std::string lastEnginePositionFen;  // Track position to detect changes
+  std::map<std::string, int> positionHistory;  // Track FEN occurrences for threefold repetition
 
   void renderGame();
   void updateGame();
@@ -77,4 +79,7 @@ private:
   std::string parseDepth(const std::string &infoLine);
   std::string parsePV(const std::string &infoLine);
   void addMoveToHistory(const std::string &algebraic, const std::string &san);
+  
+  // Threefold repetition detection
+  bool isThreefoldRepetition() const;
 };
