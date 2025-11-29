@@ -351,8 +351,13 @@ void ChessAnalysisProgram::updateGame() {
     if (!moveHistory.empty()) {
       // Undo last move
       moveHistory.pop_back();
-      currentPosition.initializeBoard();
-      currentPosition.setWhiteTurn(true);
+      // Reset to the current base FEN (standard or loaded) before replaying
+      if (currentBaseFen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+        currentPosition.initializeBoard();
+        currentPosition.setWhiteTurn(true);
+      } else {
+        currentPosition.loadFromFEN(currentBaseFen.c_str());
+      }
       
       // Replay all moves except the last one
       for (const auto& move : moveHistory) {
@@ -366,7 +371,8 @@ void ChessAnalysisProgram::updateGame() {
       
       lastEnginePositionFen = "";  // Force engine update on next frame
       
-      // Update engine position if enabled
+      // Force engine to refresh for new position and update if enabled
+      lastEnginePositionFen = "";  // Force engine update on next frame
       if (uciEngine->isEnabled()) {
         updateEnginePosition();
       }
