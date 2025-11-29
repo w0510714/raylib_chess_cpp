@@ -18,6 +18,7 @@ public:
     return whiteTurn;
   }
   void initializeBoard();
+  bool loadFromFEN(const char* fen);
 
 private:
   PieceType board[8][8];
@@ -60,5 +61,4 @@ private:
   bool blackRookKingsideMoved = false;
   bool blackRookQueensideMoved = false;
 
-  bool loadFromFEN(const char* fen);
 };

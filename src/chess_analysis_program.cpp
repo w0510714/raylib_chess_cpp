@@ -2,11 +2,12 @@
 #include <raylib.h>
 #include <regex>
 #include <sstream>
+#include <fstream>
 
 ChessAnalysisProgram::ChessAnalysisProgram() {
   // Initialization
-  const int screenWidth = 1920;
-  const int screenHeight = 1080;
+  const int screenWidth = 1820;
+  const int screenHeight = 980;
 
   InitWindow(screenWidth, screenHeight, "Chess Analysis Program");
 
@@ -20,8 +21,23 @@ ChessAnalysisProgram::ChessAnalysisProgram() {
   // Update this path to point to your Stockfish executable
   uciEngine = std::make_unique<UCIEngine>("src/stockfish/stockfish.exe");
 
-  // Set starting FEN (standard starting position)
-  startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  // Load starting FEN from file, or use standard starting position as fallback
+  std::ifstream fenFile("src/initial_position.fen");
+  if (fenFile.is_open()) {
+    std::string fenString;
+    if (std::getline(fenFile, fenString)) {
+      startingFen = fenString;
+      TraceLog(LOG_INFO, "Loaded starting FEN from initial_position.fen: %s", startingFen.c_str());
+    }
+    fenFile.close();
+  } else {
+    // Use standard starting position as fallback
+    startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    TraceLog(LOG_WARNING, "initial_position.fen not found, using standard starting position");
+  }
+  
+  // Initialize currentBaseFen to the starting FEN (L key state)
+  currentBaseFen = startingFen;
   moveHistory.clear();
 }
 
@@ -142,17 +158,67 @@ void ChessAnalysisProgram::renderUI() {
 }
 
 void ChessAnalysisProgram::renderBoard() {
-  // Calculate scale to fit board perfectly in window
-  float scale = GetScreenHeight() / (float)boardTexture.height;
-  DrawTextureEx(this->boardTexture, {0, 0}, 0.0f, scale, WHITE);
+  // Calculate layout with borders for coordinates
+  int screenHeight = GetScreenHeight();
+  int screenWidth = GetScreenWidth();
+  int labelSize = 40;  // Size of coordinate label strips
+  int padding = 10;    // Padding around board
+  
+  // Calculate board scale to fit with labels (max 70% of screen height for board itself)
+  float maxBoardHeight = screenHeight * 0.7f;
+  float boardScale = maxBoardHeight / (float)boardTexture.height;
+  
+  // Calculate board dimensions
+  float boardWidth = boardTexture.width * boardScale;
+  float boardHeight = boardTexture.height * boardScale;
+  
+  // Position board on left side with padding
+  float totalWidth = boardWidth + labelSize + (padding * 2);
+  float totalHeight = boardHeight + labelSize + (padding * 2);
+  float startX = padding * 2;  // Left-aligned with small padding
+  float startY = (screenHeight - totalHeight) / 2.0f;  // Vertically centered
+  
+  // Draw top label strip (files: a-h)
+  DrawRectangle(startX + labelSize, startY, (int)boardWidth, labelSize, LIGHTGRAY);
+  for (int i = 0; i < 8; i++) {
+    float labelX = startX + labelSize + (boardWidth / 8.0f) * i + (boardWidth / 16.0f) - 5;
+    DrawText(TextFormat("%c", 'a' + i), (int)labelX, (int)(startY + 12), 16, BLACK);
+  }
+  
+  // Draw left label strip (ranks: 8-1)
+  DrawRectangle(startX, startY + labelSize, labelSize, (int)boardHeight, LIGHTGRAY);
+  for (int i = 0; i < 8; i++) {
+    float labelY = startY + labelSize + (boardHeight / 8.0f) * i + (boardHeight / 16.0f) - 8;
+    DrawText(TextFormat("%d", 8 - i), (int)(startX + 12), (int)labelY, 16, BLACK);
+  }
+  
+  // Draw the board itself
+  DrawTextureEx(this->boardTexture, {startX + labelSize, startY + labelSize}, 0.0f, boardScale, WHITE);
 }
 
 void ChessAnalysisProgram::renderPieces() {
-  float boardScale = GetScreenHeight() / (float)boardTexture.height;
-  float squareSize = (boardTexture.width * boardScale) / 8.0f;
+  // Match board positioning from renderBoard()
+  int screenHeight = GetScreenHeight();
+  int screenWidth = GetScreenWidth();
+  int labelSize = 40;
+  int padding = 10;
+  
+  float maxBoardHeight = screenHeight * 0.7f;
+  float boardScale = maxBoardHeight / (float)boardTexture.height;
+  
+  float boardWidth = boardTexture.width * boardScale;
+  float boardHeight = boardTexture.height * boardScale;
+  
+  float totalWidth = boardWidth + labelSize + (padding * 2);
+  float totalHeight = boardHeight + labelSize + (padding * 2);
+  float startX = padding * 2;
+  float startY = (screenHeight - totalHeight) / 2.0f;
+  
+  float boardStartX = startX + labelSize;
+  float boardStartY = startY + labelSize;
+  float squareSize = boardWidth / 8.0f;
   float pieceScale = boardScale * 1.0f;
-  float pieceOffset =
-      (squareSize - (pieceScale * boardTexture.width / 10.5f)) / 2.0f;
+  float pieceOffset = (squareSize - (pieceScale * boardTexture.width / 10.5f)) / 2.0f;
 
   for (int row = 0; row < 8; ++row) {
     for (int col = 0; col < 8; ++col) {
@@ -165,8 +231,8 @@ void ChessAnalysisProgram::renderPieces() {
         continue;
 
       Texture2D tex = getTextureForPiece(piece);
-      Vector2 pos = {col * squareSize + pieceOffset,
-                     row * squareSize + pieceOffset};
+      Vector2 pos = {boardStartX + col * squareSize + pieceOffset,
+                     boardStartY + row * squareSize + pieceOffset};
       DrawTextureEx(tex, pos, 0.0f, pieceScale, WHITE);
     }
   }
@@ -213,14 +279,34 @@ Texture2D ChessAnalysisProgram::getTextureForPiece(PieceType piece) {
 }
 
 void ChessAnalysisProgram::updateGame() {
-  float boardScale = GetScreenHeight() / (float)boardTexture.height;
-  float squareSize = (boardTexture.width * boardScale) / 8.0f;
-  float pieceScale = boardScale * 1.0f;
+  // Match board positioning from renderBoard()
+  int screenHeight = GetScreenHeight();
+  int screenWidth = GetScreenWidth();
+  int labelSize = 40;
+  int padding = 10;
+  
+  float maxBoardHeight = screenHeight * 0.7f;
+  float boardScale = maxBoardHeight / (float)boardTexture.height;
+  
+  float boardWidth = boardTexture.width * boardScale;
+  float boardHeight = boardTexture.height * boardScale;
+  
+  float totalWidth = boardWidth + labelSize + (padding * 2);
+  float totalHeight = boardHeight + labelSize + (padding * 2);
+  float startX = padding * 2;
+  float startY = (screenHeight - totalHeight) / 2.0f;
+  
+  float boardStartX = startX + labelSize;
+  float boardStartY = startY + labelSize;
+  float squareSize = boardWidth / 8.0f;
+  
   Vector2 mousePos = GetMousePosition();
 
   // Calculate board-relative position
-  int col = static_cast<int>(mousePos.x / squareSize);
-  int row = static_cast<int>(mousePos.y / squareSize);
+  float relMouseX = mousePos.x - boardStartX;
+  float relMouseY = mousePos.y - boardStartY;
+  int col = static_cast<int>(relMouseX / squareSize);
+  int row = static_cast<int>(relMouseY / squareSize);
 
   // Check for X key press to toggle engine
   if (IsKeyPressed(KEY_X)) {
@@ -235,14 +321,26 @@ void ChessAnalysisProgram::updateGame() {
   }
 
   if (IsKeyPressed(KEY_R)) {
-    // Reset game
+    // Reset game to standard chess starting position
+    currentBaseFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     currentPosition.initializeBoard();
-    moveHistory.clear();
-    // Set to white to move
     currentPosition.setWhiteTurn(true);
-    // GameStatus Reset
-    GameStatus status = GameStatus::ONGOING;
-    TraceLog(LOG_INFO, "Game reset to starting position");
+    moveHistory.clear();
+    lastEnginePositionFen = "";  // Force engine update on next frame
+    TraceLog(LOG_INFO, "Game reset to standard chess starting position");
+    // Update engine position if enabled
+    if (uciEngine->isEnabled()) {
+      updateEnginePosition();
+    }
+  }
+
+  if (IsKeyPressed(KEY_L)) {
+    // Reset game to starting position from FEN
+    currentBaseFen = startingFen;  // Use the loaded FEN as base
+    currentPosition.loadFromFEN(startingFen.c_str());
+    moveHistory.clear();
+    lastEnginePositionFen = "";  // Force engine update on next frame
+    TraceLog(LOG_INFO, "Game reset to FEN starting position");
     // Update engine position if enabled
     if (uciEngine->isEnabled()) {
       updateEnginePosition();
@@ -266,6 +364,8 @@ void ChessAnalysisProgram::updateGame() {
         currentPosition.makeMove(startRow, startCol, endRow, endCol);
       }
       
+      lastEnginePositionFen = "";  // Force engine update on next frame
+      
       // Update engine position if enabled
       if (uciEngine->isEnabled()) {
         updateEnginePosition();
@@ -277,6 +377,21 @@ void ChessAnalysisProgram::updateGame() {
 
   // Poll engine analysis if enabled
   if (uciEngine->isEnabled()) {
+    // Update engine position every frame to ensure it's analyzing current position
+    std::vector<std::string> moves;
+    for (const auto& move : moveHistory) {
+      moves.push_back(move.algebraic);
+    }
+    std::string currentFen = startingFen + "|" + std::to_string(moveHistory.size());
+    
+    // Detect position change and reset analysis
+    if (currentFen != lastEnginePositionFen) {
+      lastEnginePositionFen = currentFen;
+      currentAnalysis = EngineAnalysis();  // Clear old analysis
+      updateEnginePosition();  // Set new position
+      TraceLog(LOG_INFO, "Engine position updated - analyzing new position");
+    }
+    
     currentAnalysis = uciEngine->pollAnalysis();
   }
 
@@ -305,8 +420,10 @@ void ChessAnalysisProgram::updateGame() {
   }
 
   if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && dragging) {
-    int newCol = static_cast<int>(mousePos.x / squareSize);
-    int newRow = static_cast<int>(mousePos.y / squareSize);
+    float newRelMouseX = mousePos.x - boardStartX;
+    float newRelMouseY = mousePos.y - boardStartY;
+    int newCol = static_cast<int>(newRelMouseX / squareSize);
+    int newRow = static_cast<int>(newRelMouseY / squareSize);
 
     // Only make the move if both the start and end positions are within the
     // board
@@ -333,11 +450,12 @@ void ChessAnalysisProgram::updateGame() {
 
 void ChessAnalysisProgram::renderGame() {
   BeginDrawing();
-  ClearBackground(RAYWHITE);
+  ClearBackground({40, 44, 52, 255});  // Dark gray background
   renderBoard();
   renderPieces();
   renderEngineAnalysis();
   renderMoveHistory();
+  renderControls();
   EndDrawing();
 }
 
@@ -357,7 +475,8 @@ void ChessAnalysisProgram::updateEnginePosition() {
     for (const auto& move : moveHistory) {
       moves.push_back(move.algebraic);
     }
-    uciEngine->setPosition(startingFen, moves);
+    // Use currentBaseFen which changes based on R/L key press
+    uciEngine->setPosition(currentBaseFen, moves);
   }
 }
 
@@ -448,24 +567,51 @@ std::string ChessAnalysisProgram::parsePV(const std::string &infoLine) {
 }
 
 void ChessAnalysisProgram::renderEngineAnalysis() {
+  int screenWidth = GetScreenWidth();
+  int screenHeight = GetScreenHeight();
+  int boxWidth = 300;
+  int boxHeight = 380;
+  int xPos = screenWidth - boxWidth - 20;
+  int yPos = 20;
+  int padding = 10;
+  
+  // Draw box background
+  DrawRectangle(xPos, yPos, boxWidth, boxHeight, {50, 55, 65, 255});  // Dark slate blue
+  // Draw box border
+  DrawRectangleLines(xPos, yPos, boxWidth, boxHeight, {100, 200, 255, 255});  // Light blue border
+  
+  // Draw title
+  DrawText("UCI Engine Analysis", xPos + padding, yPos + padding, 14, {100, 200, 255, 255});
+  
+  int contentYPos = yPos + 28;
+  
+  // Draw mode indicator
+  bool isStandardFen = (currentBaseFen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+  const char* modeText = isStandardFen ? "Mode: Standard (R)" : "Mode: FEN (L)";
+  Color modeColor = isStandardFen ? (Color){200, 200, 200, 255} : (Color){200, 200, 200, 255};
+  DrawText(modeText, xPos + padding, contentYPos, 10, modeColor);
+  
+  contentYPos += 15;
+  
   if (!uciEngine || !uciEngine->isEnabled()) {
     // Draw disabled indicator
-    DrawText("Engine: OFF (Press X to enable)", 1100, 20, 20, DARKGRAY);
+    DrawText("Engine: OFF", xPos + padding, contentYPos, 14, {180, 180, 180, 255});
+    DrawText("(Press X to enable)", xPos + padding, contentYPos + 20, 12, {150, 150, 150, 255});
     return;
   }
 
   // Draw enabled indicator
-  DrawText("Engine: ON (Press X to disable)", 1100, 20, 20, GREEN);
+  DrawText("Engine: ON", xPos + padding, contentYPos, 14, {100, 255, 150, 255});
 
   // Check if we have analysis results
   if (!currentAnalysis.hasResult) {
-    DrawText("Analyzing...", 1100, 50, 18, GRAY);
+    DrawText("Analyzing...", xPos + padding, contentYPos + 25, 12, {150, 150, 150, 255});
     return;
   }
 
   // Display analysis lines
-  int yPos = 60;
-  int lineHeight = 80;
+  int yPos_lines = contentYPos + 25;
+  int lineHeight = 85;
 
   for (size_t i = 0; i < currentAnalysis.lines.size() && i < 4; i++) {
     const auto &line = currentAnalysis.lines[i];
@@ -476,37 +622,45 @@ void ChessAnalysisProgram::renderEngineAnalysis() {
     std::string pv = parsePV(line.text);
 
     // Draw line number
-    DrawText(TextFormat("Line %d:", line.multipv), 1100, yPos, 18, DARKBLUE);
+    DrawText(TextFormat("Line %d:", line.multipv), xPos + padding, yPos_lines, 12, {100, 200, 255, 255});
 
     // Draw evaluation
-    Color evalColor = (eval[0] == '+')   ? DARKGREEN
-                      : (eval[0] == '-') ? RED
-                                         : GRAY;
-    DrawText(TextFormat("Eval: %s", eval.c_str()), 1100, yPos + 20, 16,
-             evalColor);
+    Color evalColor = (eval[0] == '+')   ? (Color){100, 255, 150, 255}
+                      : (eval[0] == '-') ? (Color){255, 100, 100, 255}
+                                         : (Color){200, 200, 200, 255};
+    DrawText(TextFormat("Eval: %s", eval.c_str()), xPos + padding, yPos_lines + 18, 11, evalColor);
 
     // Draw depth
-    DrawText(TextFormat("Depth: %s", depth.c_str()), 1100, yPos + 40, 14,
-             DARKGRAY);
+    DrawText(TextFormat("Depth: %s", depth.c_str()), xPos + padding, yPos_lines + 33, 10, {180, 180, 180, 255});
 
-    // Draw PV
-    DrawText(TextFormat("PV: %s", pv.c_str()), 1100, yPos + 58, 14, BLACK);
+    // Draw PV (truncated)
+    std::string pvDisplay = pv.length() > 30 ? pv.substr(0, 27) + "..." : pv;
+    DrawText(TextFormat("PV: %s", pvDisplay.c_str()), xPos + padding, yPos_lines + 46, 10, {220, 220, 220, 255});
 
-    yPos += lineHeight;
+    yPos_lines += lineHeight;
   }
 }
 
 void ChessAnalysisProgram::renderMoveHistory() {
   // Draw move history on the right side of the screen
   int screenWidth = GetScreenWidth();
-  int xPos = screenWidth - 375;
-  int yPos = 20;
-  int lineHeight = 22;
-  int maxMovesToDisplay = 20;
+  int screenHeight = GetScreenHeight();
+  int boxWidth = 300;
+  int boxHeight = 500;
+  int xPos = screenWidth - boxWidth - 20;
+  int yPos = 420;
+  int padding = 10;
+  int lineHeight = 20;
+  int maxMovesToDisplay = 12;
+  
+  // Draw box background
+  DrawRectangle(xPos, yPos, boxWidth, boxHeight, {50, 65, 55, 255});  // Dark sage green
+  // Draw box border
+  DrawRectangleLines(xPos, yPos, boxWidth, boxHeight, {120, 220, 140, 255});  // Light green border
   
   // Draw title
-  DrawText("Move History:", xPos, yPos, 18, DARKBLUE);
-  yPos += 28;
+  DrawText("Move History", xPos + padding, yPos + padding, 14, {120, 220, 140, 255});
+  int contentYPos = yPos + 28;
   
   // Calculate starting index (show last maxMovesToDisplay moves)
   int startIdx = static_cast<int>(moveHistory.size()) > maxMovesToDisplay 
@@ -514,34 +668,54 @@ void ChessAnalysisProgram::renderMoveHistory() {
                  : 0;
   
   // Draw move pairs (white and black moves side-by-side)
+  int displayYPos = contentYPos;
   for (size_t i = startIdx; i < moveHistory.size(); i += 2) {
     int moveNumber = (i / 2) + 1;
     
     // Draw move number
-    DrawText(TextFormat("%2d.", moveNumber), xPos, yPos, 16, DARKGRAY);
-    int textXPos = xPos + 35;
+    DrawText(TextFormat("%d.", moveNumber), xPos + padding, displayYPos, 12, {180, 180, 180, 255});
+    int textXPos = xPos + 40;
     
     // Draw white's move
     if (i < moveHistory.size()) {
-      DrawText(moveHistory[i].algebraic.c_str(), textXPos, yPos, 16, BLACK);
+      DrawText(moveHistory[i].algebraic.c_str(), textXPos, displayYPos, 12, {220, 220, 220, 255});
       textXPos += 70;
     }
     
     // Draw black's move on the same line if it exists
     if (i + 1 < moveHistory.size()) {
-      DrawText(moveHistory[i + 1].algebraic.c_str(), textXPos, yPos, 16, BLACK);
+      DrawText(moveHistory[i + 1].algebraic.c_str(), textXPos, displayYPos, 12, {220, 220, 220, 255});
     }
     
-    yPos += lineHeight;
+    displayYPos += lineHeight;
   }
   
-  // Draw move counter at bottom
-  DrawText(TextFormat("Total moves: %d", (int)moveHistory.size()), xPos, yPos + 10, 14, DARKGRAY);
+  // Draw move counter
+  DrawText(TextFormat("Total: %d", (int)moveHistory.size()), xPos + padding, yPos + boxHeight - 30, 12, {180, 180, 180, 255});
+}
+
+void ChessAnalysisProgram::renderControls() {
+  int screenWidth = GetScreenWidth();
+  int screenHeight = GetScreenHeight();
+  int boxWidth = 350;
+  int boxHeight = 80;
+  int xPos = screenWidth - boxWidth - 20;
+  int yPos = screenHeight - boxHeight - 20;
+  int padding = 10;
   
-  // Draw keyboard hints
-  int hintYPos = GetScreenHeight() - 80;
-  DrawText("Controls:", xPos, hintYPos, 14, DARKGRAY);
-  DrawText("R - Reset  |  U/Left Arrow - Undo  |  X - Toggle Engine", xPos, hintYPos + 20, 12, GRAY);
+  // Draw box background
+  DrawRectangle(xPos, yPos, boxWidth, boxHeight, {65, 55, 50, 255});  // Dark burnt orange
+  // Draw box border
+  DrawRectangleLines(xPos, yPos, boxWidth, boxHeight, {255, 180, 100, 255});  // Light orange border
+  
+  // Draw title
+  DrawText("Controls", xPos + padding, yPos + padding, 14, {255, 180, 100, 255});
+  
+  // Draw control descriptions
+  DrawText("R - Reset (Standard)", xPos + padding, yPos + 28, 10, {230, 230, 230, 255});
+  DrawText("L - Reset (FEN)", xPos + padding, yPos + 40, 10, {230, 230, 230, 255});
+  DrawText("U / Left - Undo", xPos + padding, yPos + 52, 10, {230, 230, 230, 255});
+  DrawText("X - Engine", xPos + padding, yPos + 64, 10, {230, 230, 230, 255});
 }
 
 void ChessAnalysisProgram::addMoveToHistory(const std::string &algebraic, const std::string &san) {

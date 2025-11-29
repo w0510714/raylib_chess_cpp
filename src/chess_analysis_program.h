@@ -50,8 +50,10 @@ private:
   // UCI Engine integration
   std::unique_ptr<UCIEngine> uciEngine;
   std::string startingFen;
+  std::string currentBaseFen;  // Current base FEN (standard or loaded FEN)
   std::vector<Move> moveHistory;
   EngineAnalysis currentAnalysis;
+  std::string lastEnginePositionFen;  // Track position to detect changes
 
   void renderGame();
   void updateGame();
@@ -60,6 +62,7 @@ private:
   void renderPieces();
   void renderEngineAnalysis();
   void renderMoveHistory();
+  void renderControls();
   void getTextureForPiece();
   void loadAllTextures();
   void unloadAllTextures();
