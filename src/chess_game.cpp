@@ -43,6 +43,19 @@ void ChessGame::initializeBoard() {
   whiteTurn = true;
   status = GameStatus::ONGOING;
   gameOver = false;
+  
+  // Reset castling rights
+  whiteKingMoved = false;
+  blackKingMoved = false;
+  whiteRookKingsideMoved = false;
+  whiteRookQueensideMoved = false;
+  blackRookKingsideMoved = false;
+  blackRookQueensideMoved = false;
+  
+  // Reset en passant
+  enPassantTargetRow = -1;
+  enPassantTargetCol = -1;
+  halfMoveClock = 0;
 
   // Black back rank (row 0) and pawns (row 1)
   board[0][0] = PieceType::BLACK_ROOK;
@@ -731,24 +744,113 @@ bool ChessGame::isValidKingMove(PieceType piece, int startRow, int startCol,
   int colDiff = std::abs(endCol - startCol);
 
   // Normal king move: 1 square any direction
-  if (rowDiff <= 1 && colDiff <= 1)
+  if (rowDiff <= 1 && colDiff <= 1 && (rowDiff + colDiff > 0))
     return true;
 
   // Castling move
   bool isWhite = (piece == PieceType::WHITE_KING);
   if (rowDiff == 0 && colDiff == 2 && !kingMoved) {
+    // Cannot castle if king is in check
+    if (isKingInCheck(isWhite))
+      return false;
+
     // Kingside castling
     if (endCol > startCol && !rookKingsideMoved) {
+      // Check squares between king and rook are empty
       if (board[startRow][5] == PieceType::EMPTY &&
-          board[startRow][6] == PieceType::EMPTY)
-        return true;
+          board[startRow][6] == PieceType::EMPTY) {
+        // Check that king doesn't pass through check at col 5
+        // We can't modify board here, so we check if any enemy piece attacks col 5
+        bool colFiveUnderAttack = false;
+        for (int r = 0; r < 8; ++r) {
+          for (int c = 0; c < 8; ++c) {
+            PieceType attacker = board[r][c];
+            if (attacker == PieceType::EMPTY) continue;
+
+            bool isWhiteAttacker = (attacker == PieceType::WHITE_PAWN ||
+                                   attacker == PieceType::WHITE_KNIGHT ||
+                                   attacker == PieceType::WHITE_BISHOP ||
+                                   attacker == PieceType::WHITE_ROOK ||
+                                   attacker == PieceType::WHITE_QUEEN ||
+                                   attacker == PieceType::WHITE_KING);
+
+            if (isWhiteAttacker == isWhite) continue; // Skip friendly pieces
+
+            // Check if this enemy piece can attack col 5
+            bool canAttack = false;
+            if (attacker == PieceType::WHITE_PAWN || attacker == PieceType::BLACK_PAWN)
+              canAttack = isValidPawnMove(attacker, r, c, startRow, 5, board, -1, -1);
+            else if (attacker == PieceType::WHITE_KING || attacker == PieceType::BLACK_KING)
+              canAttack = isValidKingMove(attacker, r, c, startRow, 5, board, true, true, true);
+            else if (attacker == PieceType::WHITE_QUEEN || attacker == PieceType::BLACK_QUEEN)
+              canAttack = isValidQueenMove(attacker, r, c, startRow, 5, board);
+            else if (attacker == PieceType::WHITE_ROOK || attacker == PieceType::BLACK_ROOK)
+              canAttack = isValidRookMove(attacker, r, c, startRow, 5, board);
+            else if (attacker == PieceType::WHITE_BISHOP || attacker == PieceType::BLACK_BISHOP)
+              canAttack = isValidBishopMove(attacker, r, c, startRow, 5, board);
+            else if (attacker == PieceType::WHITE_KNIGHT || attacker == PieceType::BLACK_KNIGHT)
+              canAttack = isValidKnightMove(attacker, r, c, startRow, 5, board);
+
+            if (canAttack) {
+              colFiveUnderAttack = true;
+              break;
+            }
+          }
+          if (colFiveUnderAttack) break;
+        }
+        
+        if (!colFiveUnderAttack)
+          return true;
+      }
     }
     // Queenside castling
     if (endCol < startCol && !rookQueensideMoved) {
+      // Check squares between king and rook are empty
       if (board[startRow][1] == PieceType::EMPTY &&
           board[startRow][2] == PieceType::EMPTY &&
-          board[startRow][3] == PieceType::EMPTY)
-        return true;
+          board[startRow][3] == PieceType::EMPTY) {
+        // Check that king doesn't pass through check at col 3
+        bool colThreeUnderAttack = false;
+        for (int r = 0; r < 8; ++r) {
+          for (int c = 0; c < 8; ++c) {
+            PieceType attacker = board[r][c];
+            if (attacker == PieceType::EMPTY) continue;
+
+            bool isWhiteAttacker = (attacker == PieceType::WHITE_PAWN ||
+                                   attacker == PieceType::WHITE_KNIGHT ||
+                                   attacker == PieceType::WHITE_BISHOP ||
+                                   attacker == PieceType::WHITE_ROOK ||
+                                   attacker == PieceType::WHITE_QUEEN ||
+                                   attacker == PieceType::WHITE_KING);
+
+            if (isWhiteAttacker == isWhite) continue; // Skip friendly pieces
+
+            // Check if this enemy piece can attack col 3
+            bool canAttack = false;
+            if (attacker == PieceType::WHITE_PAWN || attacker == PieceType::BLACK_PAWN)
+              canAttack = isValidPawnMove(attacker, r, c, startRow, 3, board, -1, -1);
+            else if (attacker == PieceType::WHITE_KING || attacker == PieceType::BLACK_KING)
+              canAttack = isValidKingMove(attacker, r, c, startRow, 3, board, true, true, true);
+            else if (attacker == PieceType::WHITE_QUEEN || attacker == PieceType::BLACK_QUEEN)
+              canAttack = isValidQueenMove(attacker, r, c, startRow, 3, board);
+            else if (attacker == PieceType::WHITE_ROOK || attacker == PieceType::BLACK_ROOK)
+              canAttack = isValidRookMove(attacker, r, c, startRow, 3, board);
+            else if (attacker == PieceType::WHITE_BISHOP || attacker == PieceType::BLACK_BISHOP)
+              canAttack = isValidBishopMove(attacker, r, c, startRow, 3, board);
+            else if (attacker == PieceType::WHITE_KNIGHT || attacker == PieceType::BLACK_KNIGHT)
+              canAttack = isValidKnightMove(attacker, r, c, startRow, 3, board);
+
+            if (canAttack) {
+              colThreeUnderAttack = true;
+              break;
+            }
+          }
+          if (colThreeUnderAttack) break;
+        }
+        
+        if (!colThreeUnderAttack)
+          return true;
+      }
     }
   }
 
